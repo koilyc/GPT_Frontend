@@ -179,7 +179,7 @@ export const NotificationsPage: React.FC = () => {
                                 <div className="space-y-1">
                                   {Object.entries(otherFields).map(([key, value]) => {
                                     // Skip nested objects and null values
-                                    if (typeof value === 'object' || value === null) return null;
+                                    if (typeof value === 'object' || value == null) return null;
                                     return (
                                       <div key={key} className="text-sm">
                                         <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span>{' '}

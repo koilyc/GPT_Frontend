@@ -333,14 +333,6 @@ export const DatasetDetailPage: React.FC = () => {
   // Calculate stats from all images, not just current page
   const totalSize = allImages.reduce((sum, img) => sum + img.size, 0);
 
-  if (isLoading) {
-    return (
-      <Layout>
-        <LoadingState message="Loading dataset..." />
-      </Layout>
-    );
-  }
-
   if (!dataset) {
     return (
       <Layout>
