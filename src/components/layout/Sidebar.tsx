@@ -17,7 +17,6 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams<{ workspaceId?: string; projectId?: string }>();
   const { user, logout } = useAuthStore();
-  const { currentWorkspace, currentProject } = useAppStore();
   
   const currentWorkspaceId = params.workspaceId ? parseInt(params.workspaceId) : undefined;
   const currentProjectId = params.projectId ? parseInt(params.projectId) : undefined;
