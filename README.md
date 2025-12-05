@@ -136,7 +136,7 @@ All API calls are centralized in the `src/api/` directory with proper TypeScript
 ## Repo-based Agent (示範)
 
 這是一個把 agent 邏輯放在 repo 裡的示範。
-工作流程：當 issue_comment / pull_request_review_comment 建立時，Workflow 會 checkout 並跑 scripts/agent.js。
+工作流程：當 issue_comment / pull_request_review_comment 建立時，Workflow 會 checkout 並跑 scripts/agent.cjs。
 
 設定（Repository → Settings → Secrets）：
 - OPENAI_API_KEY: (如果你用 OpenAI)
