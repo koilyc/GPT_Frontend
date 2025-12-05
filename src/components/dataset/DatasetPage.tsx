@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { FolderIcon, PlusIcon, XIcon, ImageIcon, UploadIcon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { FolderIcon, PlusIcon, XIcon, ImageIcon, UploadIcon, ArrowLeftIcon } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
@@ -8,16 +8,20 @@ import { LoadingState } from '../ui/LoadingState';
 import { EmptyState } from '../ui/EmptyState';
 import { StatCard } from '../ui/StatCard';
 import { Layout } from '../layout/Layout';
+import { Breadcrumb } from '../ui/Breadcrumb';
 import { useDatasets } from '../../hooks/useDatasets';
 import { useWorkspaces } from '../../hooks/useWorkspaces';
 import { useForm } from '../../hooks/useForm';
+import { imageAPI } from '../../api';
 import type { CreateDatasetRequest } from '../../types';
 
 export const DatasetPage: React.FC = () => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
+  const navigate = useNavigate();
   const { workspaces } = useWorkspaces();
   const { datasets, isLoading, createDataset } = useDatasets(workspaceId);
   const [createMode, setCreateMode] = useState(false);
+  const [imageCount, setImageCount] = useState<Record<number, number>>({});
 
   const workspace = workspaceId ? workspaces.find(w => w.id === parseInt(workspaceId)) : null;
 
@@ -38,6 +42,30 @@ export const DatasetPage: React.FC = () => {
       setCreateMode(false);
     },
   });
+
+  // Load image count for each dataset
+  useEffect(() => {
+    const loadImageCounts = async () => {
+      if (!workspaceId || datasets.length === 0) return;
+      
+      const counts: Record<number, number> = {};
+      await Promise.all(
+        datasets.map(async (dataset) => {
+          try {
+            const result = await imageAPI.getAll(parseInt(workspaceId), dataset.id, { limit: 1 });
+            counts[dataset.id] = result.total_count;
+          } catch (error) {
+            console.error(`Failed to load image count for dataset ${dataset.id}:`, error);
+            counts[dataset.id] = 0;
+          }
+        })
+      );
+      setImageCount(counts);
+    };
+
+    loadImageCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId, datasets.length, datasets.map(d => d.id).join(',')]);
 
   if (isLoading) {
     return (
@@ -65,6 +93,26 @@ export const DatasetPage: React.FC = () => {
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Breadcrumb Navigation */}
+            <div className="flex items-center justify-between mb-6">
+              <Breadcrumb 
+                items={[
+                  { label: 'Workspaces', href: '/workspaces' },
+                  { label: workspace.name, href: `/workspaces/${workspaceId}` },
+                  { label: 'Datasets', active: true }
+                ]}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/workspaces/${workspaceId}`)}
+                className="flex items-center space-x-2"
+              >
+                <ArrowLeftIcon className="w-4 h-4" />
+                <span>Back to Workspace</span>
+              </Button>
+            </div>
+
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">
@@ -96,8 +144,8 @@ export const DatasetPage: React.FC = () => {
               iconBgColor="bg-purple-500"
             />
             <StatCard
-              title="Images"
-              value="0" // TODO: Add actual image count
+              title="Total Images"
+              value={Object.values(imageCount).reduce((sum, count) => sum + count, 0)}
               icon={ImageIcon}
               iconColor="text-white"
               iconBgColor="bg-blue-500"
@@ -218,6 +266,19 @@ export const DatasetPage: React.FC = () => {
                         {dataset.description && (
                           <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">{dataset.description}</p>
                         )}
+                        
+                        {/* Stats */}
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                            <ImageIcon className="w-4 h-4 mr-1 text-blue-500" />
+                            <span>{imageCount[dataset.id] ?? '...'} images</span>
+                          </div>
+                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                            <FolderIcon className="w-4 h-4 mr-1 text-purple-500" />
+                            <span>{dataset.project_count ?? 0} projects</span>
+                          </div>
+                        </div>
+                        
                         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-4">
                           <span>Created {dataset.created_at ? new Date(dataset.created_at).toLocaleDateString() : 'Not available'}</span>
                         </div>

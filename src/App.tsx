@@ -7,9 +7,11 @@ import { DashboardPage } from './components/dashboard/DashboardPage';
 import { WorkspacePage } from './components/workspace/WorkspacePage';
 import { WorkspaceDetailPage } from './components/workspace/WorkspaceDetailPage';
 import { ProjectPage } from './components/project/ProjectPage';
+import { ProjectDetailPage } from './components/project/ProjectDetailPage';
 import { DatasetPage } from './components/dataset/DatasetPage';
 import { DatasetDetailPage } from './components/dataset/DatasetDetailPage';
 import { ImageManagementPage } from './components/image/ImageManagementPage';
+import { NotificationsPage } from './components/notifications/NotificationsPage';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
@@ -89,6 +91,16 @@ function App() {
               } 
             />
             <Route 
+              path="/workspaces/:workspaceId/projects/:projectId" 
+              element={
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <ProjectDetailPage />
+                  </ErrorBoundary>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/workspaces/:workspaceId/datasets" 
               element={
                 <ProtectedRoute>
@@ -114,6 +126,16 @@ function App() {
                 <ProtectedRoute>
                   <ErrorBoundary>
                     <ImageManagementPage />
+                  </ErrorBoundary>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/notifications" 
+              element={
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <NotificationsPage />
                   </ErrorBoundary>
                 </ProtectedRoute>
               } 

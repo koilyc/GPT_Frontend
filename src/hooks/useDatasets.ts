@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { datasetAPI } from '../api';
-import type { Dataset, CreateDatasetRequest } from '../types';
+import type { Dataset, CreateDatasetRequest, DatasetListResponse } from '../types';
 
-export const useDatasets = (workspaceId?: string) => {
+export const useDatasets = (workspaceId?: number) => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,8 +14,8 @@ export const useDatasets = (workspaceId?: string) => {
       setIsLoading(true);
       setError(null);
       
-      const datasetsData = await datasetAPI.getByWorkspace(workspaceId);
-      setDatasets(datasetsData || []);
+      const response: DatasetListResponse = await datasetAPI.getAll(workspaceId);
+      setDatasets(response.datasets || []);
     } catch (err) {
       console.error('Failed to load datasets:', err);
       setError('Failed to load datasets');

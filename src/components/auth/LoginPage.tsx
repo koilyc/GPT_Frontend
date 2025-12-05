@@ -25,10 +25,16 @@ export const LoginPage: React.FC = () => {
       login(response.access_token, email);
       navigate('/dashboard');
     } catch (err: any) {
-      console.error('Login error:', err.response?.data);
+      console.error('Login error:', err);
+      console.error('Error response:', err.response);
+      console.error('Error message:', err.message);
       
       let errorMessage = 'Login failed';
-      if (err.response?.data) {
+      
+      // Handle network errors
+      if (!err.response) {
+        errorMessage = 'Network error. Please check your connection or try again later.';
+      } else if (err.response?.data) {
         // Handle different error response formats
         if (typeof err.response.data === 'string') {
           errorMessage = err.response.data;
@@ -43,6 +49,8 @@ export const LoginPage: React.FC = () => {
         } else if (err.response.data.message) {
           errorMessage = err.response.data.message;
         }
+      } else if (err.message) {
+        errorMessage = err.message;
       }
       
       setError(errorMessage);

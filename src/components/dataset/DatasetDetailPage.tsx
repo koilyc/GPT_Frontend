@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ImageIcon, 
   UploadIcon, 
@@ -9,7 +9,8 @@ import {
   ZoomInIcon,
   GridIcon,
   ListIcon,
-  FilterIcon
+  FilterIcon,
+  ArrowLeftIcon
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -19,8 +20,9 @@ import { EmptyState } from '../ui/EmptyState';
 import { StatCard } from '../ui/StatCard';
 import { Pagination } from '../ui/Pagination';
 import { Layout } from '../layout/Layout';
-import { datasetAPI } from '../../api';
-import type { Dataset } from '../../types';
+import { Breadcrumb } from '../ui/Breadcrumb';
+import { datasetAPI, imageAPI, workspaceAPI } from '../../api';
+import type { Dataset, Workspace } from '../../types';
 
 interface DatasetImage {
   id: number;
@@ -33,9 +35,11 @@ interface DatasetImage {
 
 export const DatasetDetailPage: React.FC = () => {
   const { workspaceId, datasetId } = useParams<{ workspaceId: string; datasetId: string }>();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Component state
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [allImages, setAllImages] = useState<DatasetImage[]>([]); // Store all images
@@ -64,8 +68,12 @@ export const DatasetDetailPage: React.FC = () => {
       try {
         setIsLoading(true);
         
-        // Load dataset info first
-        const datasetData = await datasetAPI.getById(workspaceId, parseInt(datasetId));
+        // Load workspace and dataset info first
+        const [workspaceData, datasetData] = await Promise.all([
+          workspaceAPI.getById(parseInt(workspaceId)),
+          datasetAPI.getById(workspaceId, parseInt(datasetId))
+        ]);
+        setWorkspace(workspaceData);
         setDataset(datasetData);
         
         // Load all images by fetching multiple pages if needed
@@ -75,26 +83,37 @@ export const DatasetDetailPage: React.FC = () => {
         let hasMore = true;
         
         while (hasMore) {
-          const imagesData = await datasetAPI.getImages(workspaceId, parseInt(datasetId), {
+          const imagesData = await imageAPI.getAll(workspaceId, parseInt(datasetId), {
             limit,
             offset
           });
           
+          console.log('API Response:', imagesData);
+          
           if (offset === 0) {
-            setTotalImages(imagesData.total_count);
+            setTotalImages(imagesData.total_count || 0);
           }
           
-          allImages = [...allImages, ...imagesData.Images];
+          // Handle different response formats (API returns "Images" with capital I)
+          const imagesList = Array.isArray(imagesData.Images) 
+            ? imagesData.Images 
+            : Array.isArray(imagesData.images) 
+              ? imagesData.images 
+              : Array.isArray(imagesData) 
+                ? imagesData 
+                : [];
+          
+          allImages = [...allImages, ...imagesList];
           
           // Check if we have more images to fetch
-          hasMore = imagesData.Images.length === limit && allImages.length < imagesData.total_count;
+          hasMore = imagesList.length === limit && allImages.length < (imagesData.total_count || 0);
           offset += limit;
         }
         
-        // Get presigned URLs for each image
+        // Get presigned URLs for each image (using thumbnail for better performance)
         const imageUrlPromises = allImages.map(async (img) => {
           try {
-            const urlData = await datasetAPI.getImageUrl(workspaceId, parseInt(datasetId), img.id);
+            const urlData = await imageAPI.getThumbnailUrl(workspaceId, parseInt(datasetId), img.id);
             return {
               id: img.id,
               filename: img.name,
@@ -179,19 +198,50 @@ export const DatasetDetailPage: React.FC = () => {
     setUploading(true);
     
     try {
-      // Upload images to API
-      await datasetAPI.uploadImages(workspaceId, parseInt(datasetId), files);
+      // Helper function to extract image metadata
+      const getImageMetadata = (file: File): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            // Calculate file size in KB
+            const fileSizeKb = Math.ceil(file.size / 1024);
+            
+            // Assume RGB (3 channels) for most images, RGBA (4 channels) if needed
+            const colorChannels = 3;
+            const colorDepth = 8; // 8 bits per channel is standard
+            
+            resolve({
+              width: img.width,
+              height: img.height,
+              color_depth: colorDepth,
+              color_channels: colorChannels,
+              file_size_kb: fileSizeKb
+            });
+          };
+          img.onerror = () => reject(new Error('Failed to load image'));
+          img.src = URL.createObjectURL(file);
+        });
+      };
+
+      // Upload images one by one with metadata
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const metadata = await getImageMetadata(file);
+        return imageAPI.upload(workspaceId, parseInt(datasetId), file.name, metadata, file);
+      });
+      
+      await Promise.all(uploadPromises);
       
       // Reload all images to see new uploads
-      const imagesData = await datasetAPI.getImages(workspaceId, parseInt(datasetId), {
+      const imagesData = await imageAPI.getAll(workspaceId, parseInt(datasetId), {
         limit: 100 // Use max allowed limit
       });
       setTotalImages(imagesData.total_count);
       
-      // Get presigned URLs for each image
-      const imageUrlPromises = imagesData.Images.map(async (img) => {
+      // Get presigned URLs for each image (API returns "Images" with capital I, using thumbnail for better performance)
+      const imagesList = imagesData.Images || imagesData.images || [];
+      const imageUrlPromises = imagesList.map(async (img) => {
         try {
-          const urlData = await datasetAPI.getImageUrl(workspaceId, parseInt(datasetId), img.id);
+          const urlData = await imageAPI.getThumbnailUrl(workspaceId, parseInt(datasetId), img.id);
           return {
             id: img.id,
             filename: img.name,
@@ -238,7 +288,7 @@ export const DatasetDetailPage: React.FC = () => {
     
     if (confirm('確定要刪除這張圖片嗎？')) {
       try {
-        await datasetAPI.deleteImage(workspaceId, parseInt(datasetId), imageId);
+        await imageAPI.delete(workspaceId, parseInt(datasetId), imageId);
         // Remove from all images and let the effect update the current page
         setAllImages(prev => prev.filter(img => img.id !== imageId));
         setTotalImages(prev => prev - 1);
@@ -309,6 +359,26 @@ export const DatasetDetailPage: React.FC = () => {
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Breadcrumb Navigation */}
+            <div className="flex items-center justify-between mb-6">
+              <Breadcrumb 
+                items={[
+                  { label: 'Workspaces', href: '/workspaces' },
+                  { label: workspace?.name || 'Workspace', href: `/workspaces/${workspaceId}` },
+                  { label: dataset.name, active: true }
+                ]}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/workspaces/${workspaceId}`)}
+                className="flex items-center space-x-2"
+              >
+                <ArrowLeftIcon className="w-4 h-4" />
+                <span>Back to Workspace</span>
+              </Button>
+            </div>
+
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">

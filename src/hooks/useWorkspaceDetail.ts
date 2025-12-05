@@ -16,7 +16,7 @@ interface UseWorkspaceDetailReturn {
   createDataset: (datasetData: any) => Promise<void>;
 }
 
-export const useWorkspaceDetail = (workspaceId: string): UseWorkspaceDetailReturn => {
+export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailReturn => {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [datasets, setDatasets] = useState<Dataset[]>([]);
@@ -28,15 +28,15 @@ export const useWorkspaceDetail = (workspaceId: string): UseWorkspaceDetailRetur
       setLoading(true);
       setError(null);
       
-      const [workspaceData, projectsData, datasetsData] = await Promise.all([
+      const [workspaceData, projectsResponse, datasetsResponse] = await Promise.all([
         workspaceAPI.getById(workspaceId),
         projectAPI.getAll(workspaceId),
-        datasetAPI.getByWorkspace(workspaceId)
+        datasetAPI.getAll(workspaceId)
       ]);
 
       setWorkspace(workspaceData);
-      setProjects(Array.isArray(projectsData) ? projectsData : []);
-      setDatasets(Array.isArray(datasetsData) ? datasetsData : []);
+      setProjects(projectsResponse.projects || []);
+      setDatasets(datasetsResponse.datasets || []);
 
     } catch (error) {
       console.error('Failed to load workspace data:', error);

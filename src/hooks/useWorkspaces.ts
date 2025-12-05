@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
 import { workspaceAPI } from '../api';
-import type { Workspace, PaginationParams, WorkspaceListResponse } from '../types';
+import type { Workspace, WorkspaceQueryParams, WorkspaceListResponse } from '../types';
 
-export const useWorkspaces = (initialParams?: PaginationParams) => {
+export const useWorkspaces = (initialParams?: WorkspaceQueryParams) => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [params, setParams] = useState<PaginationParams>({
-    page: 1,
+  const [params, setParams] = useState<WorkspaceQueryParams>({
+    offset: 0,
     limit: 10,
+    order_by: 'id',
+    desc: false,
     ...initialParams
   });
 
-  const loadWorkspaces = async (newParams?: PaginationParams) => {
+  const loadWorkspaces = async (newParams?: WorkspaceQueryParams) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -49,11 +51,11 @@ export const useWorkspaces = (initialParams?: PaginationParams) => {
     }
   };
 
-  const updateWorkspace = async (id: string, data: { name?: string; description?: string }) => {
+  const updateWorkspace = async (id: number, data: { name?: string; description?: string }) => {
     try {
       const updatedWorkspace = await workspaceAPI.update(id, data);
       setWorkspaces(prev => 
-        prev.map(ws => ws.id === parseInt(id) ? updatedWorkspace : ws)
+        prev.map(ws => ws.id === id ? updatedWorkspace : ws)
       );
       return updatedWorkspace;
     } catch (err) {
@@ -62,7 +64,7 @@ export const useWorkspaces = (initialParams?: PaginationParams) => {
     }
   };
 
-  const deleteWorkspace = async (id: string) => {
+  const deleteWorkspace = async (id: number) => {
     try {
       await workspaceAPI.delete(id);
       // 重新載入以保持分頁一致性
@@ -75,22 +77,23 @@ export const useWorkspaces = (initialParams?: PaginationParams) => {
 
   // 分頁控制功能
   const goToPage = (page: number) => {
-    const newParams = { ...params, page };
+    const offset = (page - 1) * (params.limit || 10);
+    const newParams = { ...params, offset };
     loadWorkspaces(newParams);
   };
 
   const changePageSize = (limit: number) => {
-    const newParams = { ...params, limit, page: 1 };
+    const newParams = { ...params, limit, offset: 0 };
     loadWorkspaces(newParams);
   };
 
-  const searchWorkspaces = (search: string) => {
-    const newParams = { ...params, search, page: 1 };
+  const searchWorkspaces = (keyword: string) => {
+    const newParams = { ...params, keyword, offset: 0 };
     loadWorkspaces(newParams);
   };
 
-  const sortWorkspaces = (sort_by: string, order: 'asc' | 'desc') => {
-    const newParams = { ...params, sort_by, order, page: 1 };
+  const sortWorkspaces = (order_by: 'id' | 'name' | 'created_at' | 'updated_at', desc: boolean) => {
+    const newParams = { ...params, order_by, desc, offset: 0 };
     loadWorkspaces(newParams);
   };
 

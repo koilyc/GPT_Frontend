@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { trainingJobAPI } from '../api';
-import type { TrainingJob, TrainingJobListResponse } from '../types';
+import type { TrainingJob, TrainingJobListResponse, JobQueryParams } from '../types';
 
 export const useTrainingJobs = (workspaceId?: number) => {
   const [trainingJobs, setTrainingJobs] = useState<TrainingJob[]>([]);
@@ -8,14 +8,7 @@ export const useTrainingJobs = (workspaceId?: number) => {
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
 
-  const fetchTrainingJobs = async (params?: {
-    keyword?: string;
-    offset?: number;
-    limit?: number;
-    order_by?: string;
-    desc?: boolean;
-    job_status?: string[];
-  }) => {
+  const fetchTrainingJobs = async (params?: JobQueryParams) => {
     if (!workspaceId) {
       setTrainingJobs([]);
       setTotalCount(0);
@@ -108,14 +101,7 @@ export const useProjectTrainingJobs = (workspaceId?: number, projectId?: number)
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
 
-  const fetchTrainingJobs = async (params?: {
-    keyword?: string;
-    offset?: number;
-    limit?: number;
-    order_by?: string;
-    desc?: boolean;
-    job_status?: string[];
-  }) => {
+  const fetchTrainingJobs = async (params?: JobQueryParams) => {
     if (!workspaceId || !projectId) return;
 
     setLoading(true);

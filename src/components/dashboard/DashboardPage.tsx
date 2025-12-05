@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { totalCount, isLoading } = useWorkspaces({ page: 1, limit: 3 });
+  const { totalCount, isLoading } = useWorkspaces({ offset: 0, limit: 3, order_by: 'id', desc: false });
   
   // Get current time for greeting
   const currentHour = new Date().getHours();

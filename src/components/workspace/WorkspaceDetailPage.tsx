@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store';
 import { useWorkspaceDetail, useTrainingJobs, useRecentWorkspaces } from '../../hooks';
+import { imageAPI, workspaceAPI, quotaAPI } from '../../api';
+import type { WorkspaceMember, QuotaResponse } from '../../types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
@@ -9,6 +11,8 @@ import { Layout } from '../layout/Layout';
 import { LoadingState } from '../ui/LoadingState';
 import { EmptyState } from '../ui/EmptyState';
 import { TrainingJobCard } from '../training/TrainingJobCard';
+import { Breadcrumb } from '../ui/Breadcrumb';
+import { Pagination } from '../ui/Pagination';
 import { 
   PlusIcon, 
   FolderIcon, 
@@ -17,7 +21,11 @@ import {
   ImageIcon,
   UsersIcon,
   SettingsIcon,
-  Zap
+  Zap,
+  ArrowLeftIcon,
+  BarChart,
+  TrashIcon,
+  MailIcon
 } from 'lucide-react';
 
 // Types for component forms
@@ -35,12 +43,37 @@ interface CreateDatasetForm {
 export const WorkspaceDetailPage: React.FC = () => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuthStore();
 
+  // Check if there's a tab in the location state
+  const initialTab = (location.state as { tab?: string })?.tab || 'overview';
+
   // UI state - ALL HOOKS MUST BE CALLED FIRST
-  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'datasets' | 'training-jobs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'datasets' | 'training-jobs' | 'members' | 'quotas'>(
+    initialTab as 'overview' | 'projects' | 'datasets' | 'training-jobs' | 'members' | 'quotas'
+  );
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersTotalCount, setMembersTotalCount] = useState(0);
+  const [membersPage, setMembersPage] = useState(1);
+  const [membersPageSize, setMembersPageSize] = useState(10);
+  const [quotas, setQuotas] = useState<QuotaResponse[]>([]);
+  const [quotasLoading, setQuotasLoading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'manager' | 'member' | 'viewer'>('member');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  
+  // Pagination states
+  const [projectsPage, setProjectsPage] = useState(1);
+  const [projectsPageSize, setProjectsPageSize] = useState(9);
+  const [datasetsPage, setDatasetsPage] = useState(1);
+  const [datasetsPageSize, setDatasetsPageSize] = useState(9);
+  const [trainingJobsPage, setTrainingJobsPage] = useState(1);
+  const [trainingJobsPageSize, setTrainingJobsPageSize] = useState(9);
   const [createProjectMode, setCreateProjectMode] = useState(false);
   const [createDatasetMode, setCreateDatasetMode] = useState(false);
+  const [datasetImageCount, setDatasetImageCount] = useState<Record<number, number>>({});
 
   // Form state
   const [projectForm, setProjectForm] = useState<CreateProjectForm>({
@@ -81,13 +114,108 @@ export const WorkspaceDetailPage: React.FC = () => {
     }
   }, [workspace, addToRecent]);
 
+  // Load members count immediately when workspace is loaded
+  useEffect(() => {
+    if (workspaceId) {
+      loadMembersCount();
+    }
+  }, [workspaceId]);
+
+  // Update tab when location state changes
+  useEffect(() => {
+    const stateTab = (location.state as { tab?: string })?.tab;
+    if (stateTab && ['overview', 'projects', 'datasets', 'training-jobs', 'members', 'quotas'].includes(stateTab)) {
+      setActiveTab(stateTab as 'overview' | 'projects' | 'datasets' | 'training-jobs' | 'members' | 'quotas');
+    }
+  }, [location.state]);
+
+  // Load members when Members tab is active or pagination changes
+  useEffect(() => {
+    if (activeTab === 'members' && workspaceId) {
+      loadMembers();
+    }
+  }, [activeTab, workspaceId, membersPage, membersPageSize]);
+
+  // Load quotas when Quotas tab is active
+  useEffect(() => {
+    if (activeTab === 'quotas' && workspaceId) {
+      loadQuotas();
+    }
+  }, [activeTab, workspaceId]);
+
+  const loadMembersCount = async () => {
+    if (!workspaceId) return;
+    try {
+      const response = await workspaceAPI.getMembers(parseInt(workspaceId), { limit: 1, offset: 0 });
+      setMembersTotalCount(response.total_count || 0);
+    } catch (error) {
+      console.error('Failed to load members count:', error);
+    }
+  };
+
+  const loadMembers = async () => {
+    if (!workspaceId) return;
+    try {
+      setMembersLoading(true);
+      const offset = (membersPage - 1) * membersPageSize;
+      const response = await workspaceAPI.getMembers(parseInt(workspaceId), { 
+        limit: membersPageSize,
+        offset: offset
+      });
+      setMembers(response.members || []);
+      setMembersTotalCount(response.total_count || 0);
+    } catch (error) {
+      console.error('Failed to load members:', error);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  const loadQuotas = async () => {
+    if (!workspaceId) return;
+    try {
+      setQuotasLoading(true);
+      const data = await quotaAPI.getAllQuotas(parseInt(workspaceId));
+      setQuotas(Array.isArray(data) ? data : [data]);
+    } catch (error) {
+      console.error('Failed to load quotas:', error);
+    } finally {
+      setQuotasLoading(false);
+    }
+  };
+
+  // Load image count for each dataset
+  useEffect(() => {
+    const loadDatasetImageCounts = async () => {
+      if (!workspaceId || !datasets || datasets.length === 0) return;
+      
+      const counts: Record<number, number> = {};
+      await Promise.all(
+        datasets.map(async (dataset) => {
+          try {
+            const result = await imageAPI.getAll(parseInt(workspaceId), dataset.id, { limit: 1 });
+            counts[dataset.id] = result.total_count;
+          } catch (error) {
+            console.error(`Failed to load image count for dataset ${dataset.id}:`, error);
+            counts[dataset.id] = 0;
+          }
+        })
+      );
+      setDatasetImageCount(counts);
+    };
+
+    loadDatasetImageCounts();
+  }, [workspaceId, datasets]);
+
   // Tab configuration
   const tabs = useMemo(() => [
     { id: 'overview' as const, label: 'Overview', icon: FolderIcon, count: null },
     { id: 'projects' as const, label: 'Projects', icon: BrainIcon, count: projects?.length || 0 },
     { id: 'datasets' as const, label: 'Datasets', icon: DatabaseIcon, count: datasets?.length || 0 },
     { id: 'training-jobs' as const, label: 'Training Jobs', icon: Zap, count: trainingJobs?.length || 0 },
-  ], [projects, datasets, trainingJobs]);
+    { id: 'members' as const, label: 'Members', icon: UsersIcon, count: membersTotalCount },
+    { id: 'quotas' as const, label: 'Quotas', icon: BarChart, count: null },
+  ], [projects, datasets, trainingJobs, membersTotalCount]);
 
   // Event handlers
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -115,6 +243,53 @@ export const WorkspaceDetailPage: React.FC = () => {
   const handleViewDataset = (datasetId: number) => {
     const targetPath = `/workspaces/${workspaceId}/datasets/${datasetId}`;
     navigate(targetPath);
+  };
+
+  const handleViewProject = (projectId: number) => {
+    const targetPath = `/workspaces/${workspaceId}/projects/${projectId}`;
+    navigate(targetPath);
+  };
+
+  const handleInviteMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workspaceId || !inviteEmail) return;
+    try {
+      setInviteLoading(true);
+      await workspaceAPI.inviteMembers(parseInt(workspaceId), {
+        emails: [inviteEmail],
+        role: inviteRole
+      });
+      setInviteEmail('');
+      setInviteRole('member');
+      await loadMembers();
+      await loadMembersCount();
+    } catch (error) {
+      console.error('Failed to invite member:', error);
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const handleUpdateMemberRole = async (email: string, newRole: string) => {
+    if (!workspaceId) return;
+    try {
+      await workspaceAPI.updateMemberRole(parseInt(workspaceId), email, newRole);
+      await loadMembers();
+    } catch (error) {
+      console.error('Failed to update member role:', error);
+    }
+  };
+
+  const handleDeleteMember = async (email: string) => {
+    if (!workspaceId) return;
+    if (!confirm(`Are you sure you want to remove ${email} from this workspace?`)) return;
+    try {
+      await workspaceAPI.deleteMember(parseInt(workspaceId), email);
+      await loadMembers();
+      await loadMembersCount();
+    } catch (error) {
+      console.error('Failed to delete member:', error);
+    }
   };
 
   // CONDITIONAL RENDERS AFTER ALL HOOKS
@@ -312,7 +487,13 @@ export const WorkspaceDetailPage: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">View</Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleViewProject(project.id)}
+                  >
+                    View
+                  </Button>
                 </div>
               ))}
             </div>
@@ -384,9 +565,11 @@ export const WorkspaceDetailPage: React.FC = () => {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {projects.map((project) => (
-          <Card key={project.id} className="hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-blue-900/20">
+      {projects.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.slice((projectsPage - 1) * projectsPageSize, projectsPage * projectsPageSize).map((project) => (
+              <Card key={project.id} className="hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-blue-900/20">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-3 bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 rounded-lg shadow-sm">
@@ -413,14 +596,28 @@ export const WorkspaceDetailPage: React.FC = () => {
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 dark:from-blue-500 dark:to-indigo-500 dark:hover:from-blue-600 dark:hover:to-indigo-600 text-white shadow-sm hover:shadow-md transition-all duration-200" variant="primary">
+                <Button 
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 dark:from-blue-500 dark:to-indigo-500 dark:hover:from-blue-600 dark:hover:to-indigo-600 text-white shadow-sm hover:shadow-md transition-all duration-200" 
+                  onClick={() => handleViewProject(project.id)}
+                >
                   Open Project
                 </Button>
               </div>
             </CardContent>
-          </Card>
-        ))}
-      </div>
+              </Card>
+            ))}
+          </div>
+          
+          <Pagination
+            currentPage={projectsPage}
+            totalCount={projects.length}
+            pageSize={projectsPageSize}
+            onPageChange={setProjectsPage}
+            onPageSizeChange={setProjectsPageSize}
+            gridConfig={{ cols: { sm: 1, md: 2, lg: 3, xl: 3 } }}
+          />
+        </>
+      )}
 
       {projects.length === 0 && !createProjectMode && (
         <Card>
@@ -488,9 +685,11 @@ export const WorkspaceDetailPage: React.FC = () => {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {datasets.map((dataset) => (
-          <Card key={dataset.id} className="hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-green-50 dark:from-gray-800 dark:to-green-900/20">
+      {datasets.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {datasets.slice((datasetsPage - 1) * datasetsPageSize, datasetsPage * datasetsPageSize).map((dataset) => (
+              <Card key={dataset.id} className="hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-green-50 dark:from-gray-800 dark:to-green-900/20">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-3 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40 rounded-lg shadow-sm">
@@ -523,8 +722,15 @@ export const WorkspaceDetailPage: React.FC = () => {
               
               <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex justify-between">
+                  <span className="flex items-center">
+                    <ImageIcon className="w-4 h-4 mr-1 text-blue-500" />
+                    Images:
+                  </span>
+                  <span className="font-medium">{datasetImageCount[dataset.id] ?? '...'}</span>
+                </div>
+                <div className="flex justify-between">
                   <span>Projects:</span>
-                  <span>{dataset.project_count}</span>
+                  <span className="font-medium">{dataset.project_count}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Created by:</span>
@@ -540,9 +746,20 @@ export const WorkspaceDetailPage: React.FC = () => {
                 </Button>
               </div>
             </CardContent>
-          </Card>
-        ))}
-      </div>
+              </Card>
+            ))}
+          </div>
+          
+          <Pagination
+            currentPage={datasetsPage}
+            totalCount={datasets.length}
+            pageSize={datasetsPageSize}
+            onPageChange={setDatasetsPage}
+            onPageSizeChange={setDatasetsPageSize}
+            gridConfig={{ cols: { sm: 1, md: 2, lg: 3, xl: 3 } }}
+          />
+        </>
+      )}
 
       {datasets.length === 0 && !createDatasetMode && (
         <Card>
@@ -599,15 +816,26 @@ export const WorkspaceDetailPage: React.FC = () => {
           </CardContent>
         </Card>
       ) : trainingJobs && trainingJobs.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {trainingJobs.map((job) => (
-            <TrainingJobCard
-              key={job.id}
-              job={job}
-              onView={(job) => navigate(`/workspaces/${workspaceId}/projects/${job.project_id}/training-jobs/${job.id}`)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {trainingJobs.slice((trainingJobsPage - 1) * trainingJobsPageSize, trainingJobsPage * trainingJobsPageSize).map((job) => (
+              <TrainingJobCard
+                key={job.id}
+                job={job}
+                onView={(job) => navigate(`/workspaces/${workspaceId}/projects/${job.project_id}/training-jobs/${job.id}`)}
+              />
+            ))}
+          </div>
+          
+          <Pagination
+            currentPage={trainingJobsPage}
+            totalCount={trainingJobs.length}
+            pageSize={trainingJobsPageSize}
+            onPageChange={setTrainingJobsPage}
+            onPageSizeChange={setTrainingJobsPageSize}
+            gridConfig={{ cols: { sm: 1, md: 2, lg: 3, xl: 3 } }}
+          />
+        </>
       ) : (
         // Only show empty state if we're not loading and there's no error
         !trainingJobsLoading && !trainingJobsError && (
@@ -630,6 +858,278 @@ export const WorkspaceDetailPage: React.FC = () => {
     </div>
   );
 
+  const renderMembers = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Workspace Members</h2>
+      </div>
+
+      {/* Invite Member Form */}
+      <Card className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-blue-900/20 border-blue-200 dark:border-blue-700/50">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-blue-100 dark:border-blue-700">
+          <CardTitle className="text-blue-900 dark:text-blue-100 flex items-center space-x-2">
+            <MailIcon className="w-5 h-5" />
+            <span>Invite New Member</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleInviteMember} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+                <Input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role</label>
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as 'manager' | 'member' | 'viewer')}
+                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="viewer">Viewer</option>
+                  <option value="member">Member</option>
+                  <option value="manager">Manager</option>
+                </select>
+              </div>
+            </div>
+            <Button 
+              type="submit" 
+              disabled={inviteLoading}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+            >
+              {inviteLoading ? 'Inviting...' : 'Send Invitation'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Members List */}
+      {membersLoading ? (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading members...</p>
+          </CardContent>
+        </Card>
+      ) : members && members.length > 0 ? (
+        <>
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Role
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {members.map((member) => (
+                      <tr key={member.email} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-semibold">
+                              {member.email.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{member.email}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <select
+                            value={member.role}
+                            onChange={(e) => handleUpdateMemberRole(member.email, e.target.value)}
+                            className="text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                          >
+                            <option value="viewer">Viewer</option>
+                            <option value="member">Member</option>
+                            <option value="manager">Manager</option>
+                          </select>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            !member.pending 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          }`}>
+                            {member.pending ? 'Pending' : 'Active'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteMember(member.email)}
+                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Pagination
+            currentPage={membersPage}
+            totalCount={membersTotalCount}
+            pageSize={membersPageSize}
+            onPageChange={setMembersPage}
+            onPageSizeChange={setMembersPageSize}
+          />
+        </>
+      ) : (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <UsersIcon className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No members yet</h3>
+            <p className="text-gray-500 dark:text-gray-400">Invite team members to collaborate on this workspace.</p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+
+  const renderQuotas = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Resource Quotas</h2>
+        <Button 
+          onClick={loadQuotas}
+          variant="outline"
+          size="sm"
+          className="flex items-center space-x-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Refresh</span>
+        </Button>
+      </div>
+
+      {quotasLoading ? (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading quotas...</p>
+          </CardContent>
+        </Card>
+      ) : quotas && quotas.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {quotas.map((quota, index) => {
+            const usagePercentage = quota.limit > 0 ? (quota.current / quota.limit) * 100 : 0;
+            const isWarning = usagePercentage > 80;
+            const isDanger = usagePercentage > 95;
+            
+            return (
+              <Card key={index} className={`hover:shadow-lg transition-all duration-300 ${
+                isDanger 
+                  ? 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-300 dark:border-red-700'
+                  : isWarning
+                  ? 'bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 border-yellow-300 dark:border-yellow-700'
+                  : 'bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-blue-900/20'
+              }`}>
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-3 rounded-lg shadow-sm ${
+                      isDanger
+                        ? 'bg-gradient-to-r from-red-100 to-red-200 dark:from-red-900/40 dark:to-red-800/40'
+                        : isWarning
+                        ? 'bg-gradient-to-r from-yellow-100 to-yellow-200 dark:from-yellow-900/40 dark:to-yellow-800/40'
+                        : 'bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40'
+                    }`}>
+                      <BarChart className={`w-6 h-6 ${
+                        isDanger
+                          ? 'text-red-600 dark:text-red-400'
+                          : isWarning
+                          ? 'text-yellow-600 dark:text-yellow-400'
+                          : 'text-blue-600 dark:text-blue-400'
+                      }`} />
+                    </div>
+                    <span className={`text-xs px-3 py-1.5 rounded-full uppercase font-medium shadow-sm ${
+                      isDanger
+                        ? 'bg-red-200 text-red-800 dark:bg-red-800/40 dark:text-red-300'
+                        : isWarning
+                        ? 'bg-yellow-200 text-yellow-800 dark:bg-yellow-800/40 dark:text-yellow-300'
+                        : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                    }`}>
+                      {quota.resource_type}
+                    </span>
+                  </div>
+                  
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 capitalize">
+                    {quota.resource_type.replace('_', ' ')}
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Usage:</span>
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">
+                        {quota.current} / {quota.limit === -1 ? '∞' : quota.limit}
+                      </span>
+                    </div>
+                    
+                    {quota.limit > 0 && (
+                      <>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                          <div 
+                            className={`h-2.5 rounded-full transition-all duration-500 ${
+                              isDanger
+                                ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                : isWarning
+                                ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                                : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                            }`}
+                            style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                          ></div>
+                        </div>
+                        <p className={`text-sm font-medium ${
+                          isDanger
+                            ? 'text-red-600 dark:text-red-400'
+                            : isWarning
+                            ? 'text-yellow-600 dark:text-yellow-400'
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {usagePercentage.toFixed(1)}% used
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <BarChart className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No quota data available</h3>
+            <p className="text-gray-500 dark:text-gray-400">Resource quota information is not available for this workspace.</p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -640,6 +1140,10 @@ export const WorkspaceDetailPage: React.FC = () => {
         return renderDatasets();
       case 'training-jobs':
         return renderTrainingJobs();
+      case 'members':
+        return renderMembers();
+      case 'quotas':
+        return renderQuotas();
       default:
         return renderOverview();
     }
@@ -649,6 +1153,25 @@ export const WorkspaceDetailPage: React.FC = () => {
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
         <div className="max-w-7xl mx-auto p-6">
+          {/* Breadcrumb Navigation */}
+          <div className="flex items-center justify-between mb-6">
+            <Breadcrumb 
+              items={[
+                { label: 'Workspaces', href: '/workspaces' },
+                { label: workspace.name, active: true }
+              ]}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/workspaces')}
+              className="flex items-center space-x-2"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              <span>Back to Workspaces</span>
+            </Button>
+          </div>
+
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">

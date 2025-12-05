@@ -23,13 +23,13 @@ export const WorkspacePage: React.FC = () => {
     changePageSize,
     searchWorkspaces,
     sortWorkspaces
-  } = useWorkspaces({ page: 1, limit: 12 }); // 使用網格布局適合的數量
+  } = useWorkspaces({ offset: 0, limit: 12, order_by: 'id', desc: false }); // 使用網格布局適合的數量
   
   const { addToRecent } = useRecentWorkspaces();
   
   const [createMode, setCreateMode] = useState(false);
-  const [sortField, setSortField] = useState<string>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortField, setSortField] = useState<'id' | 'name' | 'created_at' | 'updated_at'>('name');
+  const [sortDesc, setSortDesc] = useState(false);
 
   const form = useForm<CreateWorkspaceRequest>({
     initialValues: {
@@ -49,11 +49,11 @@ export const WorkspacePage: React.FC = () => {
     },
   });
 
-  const handleSort = (field: string) => {
-    const newOrder = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
+  const handleSort = (field: 'id' | 'name' | 'created_at' | 'updated_at') => {
+    const newDesc = sortField === field ? !sortDesc : false;
     setSortField(field);
-    setSortOrder(newOrder);
-    sortWorkspaces(field, newOrder);
+    setSortDesc(newDesc);
+    sortWorkspaces(field, newDesc);
   };
 
   if (isLoading) {
@@ -108,9 +108,9 @@ export const WorkspacePage: React.FC = () => {
                 >
                   <span>名稱</span>
                   {sortField === 'name' && (
-                    sortOrder === 'asc' ? 
-                      <SortAscIcon className="w-4 h-4" /> : 
-                      <SortDescIcon className="w-4 h-4" />
+                    sortDesc ? 
+                      <SortDescIcon className="w-4 h-4" /> : 
+                      <SortAscIcon className="w-4 h-4" />
                   )}
                 </Button>
               </div>

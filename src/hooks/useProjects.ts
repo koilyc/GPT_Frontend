@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { projectAPI } from '../api';
-import type { Project, CreateProjectRequest } from '../types';
+import type { Project, CreateProjectRequest, ProjectListResponse } from '../types';
 
-export const useProjects = (workspaceId?: string) => {
+export const useProjects = (workspaceId?: number) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,8 +14,8 @@ export const useProjects = (workspaceId?: string) => {
       setIsLoading(true);
       setError(null);
       
-      const projectsData = await projectAPI.getAll(workspaceId);
-      setProjects(projectsData || []);
+      const response: ProjectListResponse = await projectAPI.getAll(workspaceId);
+      setProjects(response.projects || []);
     } catch (err) {
       console.error('Failed to load projects:', err);
       setError('Failed to load projects');
@@ -26,8 +26,10 @@ export const useProjects = (workspaceId?: string) => {
   }, [workspaceId]);
 
   const createProject = async (data: CreateProjectRequest) => {
+    if (!workspaceId) throw new Error('Workspace ID is required');
+    
     try {
-      const newProject = await projectAPI.create(data);
+      const newProject = await projectAPI.create(workspaceId, data);
       setProjects(prev => [...prev, newProject]);
       return newProject;
     } catch (err) {
@@ -36,11 +38,13 @@ export const useProjects = (workspaceId?: string) => {
     }
   };
 
-  const updateProject = async (id: string, data: Partial<CreateProjectRequest>) => {
+  const updateProject = async (projectId: number, data: Partial<CreateProjectRequest>) => {
+    if (!workspaceId) throw new Error('Workspace ID is required');
+    
     try {
-      const updatedProject = await projectAPI.update(id, data);
+      const updatedProject = await projectAPI.update(workspaceId, projectId, data);
       setProjects(prev => 
-        prev.map(project => project.id === parseInt(id) ? updatedProject : project)
+        prev.map(project => project.id === projectId ? updatedProject : project)
       );
       return updatedProject;
     } catch (err) {
@@ -49,10 +53,12 @@ export const useProjects = (workspaceId?: string) => {
     }
   };
 
-  const deleteProject = async (id: string) => {
+  const deleteProject = async (projectId: number) => {
+    if (!workspaceId) throw new Error('Workspace ID is required');
+    
     try {
-      await projectAPI.delete(id);
-      setProjects(prev => prev.filter(project => project.id !== parseInt(id)));
+      await projectAPI.delete(workspaceId, projectId);
+      setProjects(prev => prev.filter(project => project.id !== projectId));
     } catch (err) {
       console.error('Failed to delete project:', err);
       throw err;
