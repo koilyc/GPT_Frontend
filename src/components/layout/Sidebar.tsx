@@ -131,23 +131,6 @@ export const Sidebar: React.FC = () => {
           </li>
 
           {/* Current Context - Hidden since QuickNav is always visible */}
-          {false && currentWorkspace && (
-            <li>
-              <div className="text-xs font-semibold leading-6 text-gray-400">
-                Current Context
-              </div>
-              <div className="mt-2 space-y-1">
-                <div className="text-sm text-white truncate">
-                  📁 {currentWorkspace.name}
-                </div>
-                {currentProject && (
-                  <div className="text-sm text-gray-300 truncate pl-4">
-                    📊 {currentProject.name}
-                  </div>
-                )}
-              </div>
-            </li>
-          )}
 
           {/* User section */}
           <li className="mt-auto">
