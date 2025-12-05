@@ -1,0 +1,19 @@
+name: repo-assistant
+description: "Repo-scoped assistant: 回覆 PR 評論、提出修正建議並可開 PR"
+scope:
+  type: repository
+  repository: koilyc/GPT_Frontend
+triggers:
+  - event: pull_request_review_comment
+    actions:
+      - created
+  - event: issue_comment
+    actions:
+      - created
+permissions:
+  contents: read
+  pull_requests: write
+  issues: write
+run:
+  using: github-actions
+  workflow: .github/workflows/repo-agent.yml
