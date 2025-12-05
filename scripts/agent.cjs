@@ -67,13 +67,13 @@ async function callOpenAI(prompt) {
 async function run() {
   try {
     let body = "";
-    let commentTarget = null;
+    let issueNumber = null;
     if (event.comment && event.issue) {
       body = event.comment.body;
-      commentTarget = { type: "issue", number: event.issue.number };
+      issueNumber = event.issue.number;
     } else if (event.comment && event.pull_request) {
       body = event.comment.body;
-      commentTarget = { type: "pull_request", number: event.pull_request.number };
+      issueNumber = event.pull_request.number;
     } else {
       console.log("Unrecognized event. Exiting.");
       return;
@@ -81,15 +81,19 @@ async function run() {
 
     console.log("Received comment:", body);
 
-    const prompt = `你是專門協助開發者的 repo 助手。使用下面的 comment 內容來給出簡短回覆或建議。\n\nComment:\n${body}\n\n請產生中文簡短回覆。`;
+    // Sanitize comment body to prevent prompt injection
+    const sanitizedBody = body.substring(0, 2000).replace(/[\x00-\x1F\x7F]/g, "");
+    
+    const prompt = `你是專門協助開發者的 repo 助手。使用下面的 comment 內容來給出簡短回覆或建議。\n\nComment:\n${sanitizedBody}\n\n請產生中文簡短回覆。`;
 
     const reply = await callOpenAI(prompt);
     console.log("LLM reply:", reply);
 
+    // GitHub API treats PR comments as issue comments, so we use issues.createComment for both
     await octokit.issues.createComment({
       owner,
       repo: repoName,
-      issue_number: commentTarget.number,
+      issue_number: issueNumber,
       body: reply,
     });
 
