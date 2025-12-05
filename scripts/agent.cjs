@@ -13,6 +13,17 @@ const [owner, repoName] = repo.split("/");
 const token = process.env.GITHUB_TOKEN;
 const openaiKey = process.env.OPENAI_API_KEY;
 
+// Validate required environment variables
+if (!token) {
+  console.error("GITHUB_TOKEN not set");
+  process.exit(1);
+}
+
+if (!owner || !repoName || !repo.includes("/")) {
+  console.error("Invalid GITHUB_REPOSITORY format. Expected: owner/repo");
+  process.exit(1);
+}
+
 const octokit = new Octokit({ auth: token });
 
 async function callOpenAI(prompt) {
@@ -32,7 +43,19 @@ async function callOpenAI(prompt) {
       max_tokens: 600,
     }),
   });
+  
+  if (!res.ok) {
+    console.error(`OpenAI API error: ${res.status} ${res.statusText}`);
+    return "(OpenAI API 錯誤，無法產生回覆)";
+  }
+  
   const data = await res.json();
+  
+  if (data.error) {
+    console.error(`OpenAI API error: ${data.error.message}`);
+    return "(OpenAI API 錯誤，無法產生回覆)";
+  }
+  
   return data.choices?.[0]?.message?.content ?? "(no reply)";
 }
 
@@ -57,11 +80,6 @@ async function run() {
 
     const reply = await callOpenAI(prompt);
     console.log("LLM reply:", reply);
-
-    if (!owner || !repoName) {
-      console.error("Missing GITHUB_REPOSITORY info.");
-      return;
-    }
 
     await octokit.issues.createComment({
       owner,
