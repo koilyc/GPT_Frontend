@@ -37,3 +37,11 @@ This is a React TypeScript frontend application for an AI vision platform. The a
 - Implement proper authentication checks
 - Validate user inputs
 - Handle API errors gracefully
+
+## Documentation
+All technical documentation is located in the `/docs` directory:
+- **API Reference**: `/docs/api/api-reference.md` - Complete API endpoints documentation
+- **Architecture**: `/docs/architecture/` - Frontend architecture and design decisions
+- **Validation**: `/docs/validation/` - Frontend-backend API validation reports
+
+When implementing features, refer to the API reference for endpoint specifications and validation reports for type consistency.
