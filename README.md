@@ -133,6 +133,14 @@ The application uses Zustand for state management:
 
 All API calls are centralized in the `src/api/` directory with proper TypeScript types and error handling.
 
+## Documentation
+
+For detailed documentation, please visit the [docs](./docs/) directory:
+
+- 📖 **[API Reference](./docs/api/api-reference.md)** - Complete API endpoints documentation
+- 🏗️ **[Architecture](./docs/architecture/)** - Frontend architecture and design decisions
+- ✅ **[Validation Reports](./docs/validation/)** - Frontend-backend API validation and consistency reports
+
 ## Contributing
 
 1. Fork the repository
