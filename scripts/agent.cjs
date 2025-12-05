@@ -7,7 +7,15 @@ if (!githubEventPath) {
   console.error("GITHUB_EVENT_PATH not set");
   process.exit(1);
 }
-const event = JSON.parse(fs.readFileSync(githubEventPath, "utf8"));
+
+let event;
+try {
+  const eventData = fs.readFileSync(githubEventPath, "utf8");
+  event = JSON.parse(eventData);
+} catch (error) {
+  console.error(`Failed to read or parse event file: ${error.message}`);
+  process.exit(1);
+}
 const repo = process.env.GITHUB_REPOSITORY || "";
 const [owner, repoName] = repo.split("/");
 const token = process.env.GITHUB_TOKEN;
@@ -82,7 +90,11 @@ async function run() {
     console.log("Received comment:", body);
 
     // Sanitize comment body to prevent prompt injection
-    const sanitizedBody = body.substring(0, 2000).replace(/[\x00-\x1F\x7F]/g, "");
+    // Limit length and remove control characters and potentially dangerous Unicode
+    const sanitizedBody = body
+      .substring(0, 2000)
+      .replace(/[\x00-\x1F\x7F-\x9F]/g, "")  // Remove control characters
+      .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F]/g, "");  // Remove zero-width and directional characters
     
     const prompt = `你是專門協助開發者的 repo 助手。使用下面的 comment 內容來給出簡短回覆或建議。\n\nComment:\n${sanitizedBody}\n\n請產生中文簡短回覆。`;
 
