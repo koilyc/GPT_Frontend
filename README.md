@@ -133,6 +133,20 @@ The application uses Zustand for state management:
 
 All API calls are centralized in the `src/api/` directory with proper TypeScript types and error handling.
 
+## Repo-based Agent (示範)
+
+這是一個把 agent 邏輯放在 repo 裡的示範。
+工作流程：當 issue_comment / pull_request_review_comment 建立時，Workflow 會 checkout 並跑 scripts/agent.js。
+
+設定（Repository → Settings → Secrets）：
+- OPENAI_API_KEY: (如果你用 OpenAI)
+- 若需要更多權限，請配置對應的 token（建議用 fine‑grained token 或 GitHub App）
+
+測試：
+1. push branch
+2. 在 Issue / PR 留言以觸發事件
+3. 查看 workflow 執行紀錄與 action 的行為
+
 ## Contributing
 
 1. Fork the repository
