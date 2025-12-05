@@ -31,32 +31,37 @@ async function callOpenAI(prompt) {
     return `(no OPENAI_API_KEY) 收到你的留言：\n\n${prompt}`;
   }
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openaiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 600,
-    }),
-  });
-  
-  if (!res.ok) {
-    console.error(`OpenAI API error: ${res.status} ${res.statusText}`);
-    return "(OpenAI API 錯誤，無法產生回覆)";
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 600,
+      }),
+    });
+    
+    if (!res.ok) {
+      console.error(`OpenAI API error: ${res.status} ${res.statusText}`);
+      return "(OpenAI API 錯誤，無法產生回覆)";
+    }
+    
+    const data = await res.json();
+    
+    if (data.error) {
+      console.error(`OpenAI API error: ${data.error.message}`);
+      return "(OpenAI API 錯誤，無法產生回覆)";
+    }
+    
+    return data.choices?.[0]?.message?.content ?? "(no reply)";
+  } catch (error) {
+    console.error(`Network or fetch error: ${error.message}`);
+    return "(網路連線錯誤，無法產生回覆)";
   }
-  
-  const data = await res.json();
-  
-  if (data.error) {
-    console.error(`OpenAI API error: ${data.error.message}`);
-    return "(OpenAI API 錯誤，無法產生回覆)";
-  }
-  
-  return data.choices?.[0]?.message?.content ?? "(no reply)";
 }
 
 async function run() {
