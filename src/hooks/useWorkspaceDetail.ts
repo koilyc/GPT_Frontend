@@ -5,7 +5,9 @@ import type { Workspace, Project, Dataset } from '../types';
 interface UseWorkspaceDetailReturn {
   workspace: Workspace | null;
   projects: Project[];
+  projectsTotalCount: number;
   datasets: Dataset[];
+  datasetsTotalCount: number;
   loading: boolean;
   error: string | null;
   totalImages: number;
@@ -19,7 +21,9 @@ interface UseWorkspaceDetailReturn {
 export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailReturn => {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsTotalCount, setProjectsTotalCount] = useState(0);
   const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [datasetsTotalCount, setDatasetsTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +40,9 @@ export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailRetur
 
       setWorkspace(workspaceData);
       setProjects(projectsResponse.projects || []);
+      setProjectsTotalCount(projectsResponse.total_count || 0);
       setDatasets(datasetsResponse.datasets || []);
+      setDatasetsTotalCount(datasetsResponse.total_count || 0);
 
     } catch (error) {
       console.error('Failed to load workspace data:', error);
@@ -83,7 +89,9 @@ export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailRetur
   return {
     workspace,
     projects,
+    projectsTotalCount,
     datasets,
+    datasetsTotalCount,
     loading,
     error,
     totalImages,

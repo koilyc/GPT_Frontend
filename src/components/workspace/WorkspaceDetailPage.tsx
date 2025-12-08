@@ -91,7 +91,9 @@ export const WorkspaceDetailPage: React.FC = () => {
   const {
     workspace,
     projects,
+    projectsTotalCount,
     datasets,
+    datasetsTotalCount,
     loading,
     error,
     totalImages,
@@ -105,7 +107,7 @@ export const WorkspaceDetailPage: React.FC = () => {
   const { addToRecent } = useRecentWorkspaces();
 
   // Training jobs hook
-  const { trainingJobs, loading: trainingJobsLoading, error: trainingJobsError } = useTrainingJobs(workspaceId ? parseInt(workspaceId) : undefined);
+  const { trainingJobs, totalCount: trainingJobsTotalCount, loading: trainingJobsLoading, error: trainingJobsError } = useTrainingJobs(workspaceId ? parseInt(workspaceId) : undefined);
 
   // Add workspace to recent list when it's loaded
   useEffect(() => {
@@ -210,12 +212,12 @@ export const WorkspaceDetailPage: React.FC = () => {
   // Tab configuration
   const tabs = useMemo(() => [
     { id: 'overview' as const, label: 'Overview', icon: FolderIcon, count: null },
-    { id: 'projects' as const, label: 'Projects', icon: BrainIcon, count: projects?.length || 0 },
-    { id: 'datasets' as const, label: 'Datasets', icon: DatabaseIcon, count: datasets?.length || 0 },
-    { id: 'training-jobs' as const, label: 'Training Jobs', icon: Zap, count: trainingJobs?.length || 0 },
+    { id: 'projects' as const, label: 'Projects', icon: BrainIcon, count: projectsTotalCount },
+    { id: 'datasets' as const, label: 'Datasets', icon: DatabaseIcon, count: datasetsTotalCount },
+    { id: 'training-jobs' as const, label: 'Training Jobs', icon: Zap, count: trainingJobsTotalCount },
     { id: 'members' as const, label: 'Members', icon: UsersIcon, count: membersTotalCount },
     { id: 'quotas' as const, label: 'Quotas', icon: BarChart, count: null },
-  ], [projects, datasets, trainingJobs, membersTotalCount]);
+  ], [projectsTotalCount, datasetsTotalCount, trainingJobsTotalCount, membersTotalCount]);
 
   // Event handlers
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -408,7 +410,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                 <BrainIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{projects.length}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{projectsTotalCount}</p>
                 <p className="text-gray-600 dark:text-gray-400">Projects</p>
               </div>
             </div>
@@ -422,7 +424,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                 <DatabaseIcon className="w-8 h-8 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{datasets.length}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{datasetsTotalCount}</p>
                 <p className="text-gray-600 dark:text-gray-400">Datasets</p>
               </div>
             </div>
@@ -453,7 +455,7 @@ export const WorkspaceDetailPage: React.FC = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {trainingJobs ? trainingJobs.length : 0}
+                  {trainingJobsTotalCount}
                 </p>
                 <p className="text-gray-600 dark:text-gray-400">Training Jobs</p>
               </div>
@@ -610,7 +612,7 @@ export const WorkspaceDetailPage: React.FC = () => {
           
           <Pagination
             currentPage={projectsPage}
-            totalCount={projects.length}
+            totalCount={projectsTotalCount}
             pageSize={projectsPageSize}
             onPageChange={setProjectsPage}
             onPageSizeChange={setProjectsPageSize}
@@ -752,7 +754,7 @@ export const WorkspaceDetailPage: React.FC = () => {
           
           <Pagination
             currentPage={datasetsPage}
-            totalCount={datasets.length}
+            totalCount={datasetsTotalCount}
             pageSize={datasetsPageSize}
             onPageChange={setDatasetsPage}
             onPageSizeChange={setDatasetsPageSize}
@@ -829,7 +831,7 @@ export const WorkspaceDetailPage: React.FC = () => {
           
           <Pagination
             currentPage={trainingJobsPage}
-            totalCount={trainingJobs.length}
+            totalCount={trainingJobsTotalCount}
             pageSize={trainingJobsPageSize}
             onPageChange={setTrainingJobsPage}
             onPageSizeChange={setTrainingJobsPageSize}
