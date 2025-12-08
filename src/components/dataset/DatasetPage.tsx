@@ -19,7 +19,7 @@ export const DatasetPage: React.FC = () => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
   const { workspaces } = useWorkspaces();
-  const { datasets, isLoading, createDataset } = useDatasets(workspaceId);
+  const { datasets, totalCount, isLoading, createDataset } = useDatasets(workspaceId);
   const [createMode, setCreateMode] = useState(false);
   const [imageCount, setImageCount] = useState<Record<number, number>>({});
 
@@ -138,7 +138,7 @@ export const DatasetPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <StatCard
               title="Total Datasets"
-              value={datasets.length}
+              value={totalCount}
               icon={FolderIcon}
               iconColor="text-white"
               iconBgColor="bg-purple-500"
@@ -238,7 +238,7 @@ export const DatasetPage: React.FC = () => {
             <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-gray-100">
               <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
                 <FolderIcon className="h-6 w-6 text-purple-600 mr-2" />
-                All Datasets ({datasets.length})
+                All Datasets ({totalCount})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">

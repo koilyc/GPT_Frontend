@@ -4,6 +4,7 @@ import type { Dataset, CreateDatasetRequest, DatasetListResponse } from '../type
 
 export const useDatasets = (workspaceId?: number) => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,6 +17,7 @@ export const useDatasets = (workspaceId?: number) => {
       
       const response: DatasetListResponse = await datasetAPI.getAll(workspaceId, { limit: 100, offset: 0 });
       setDatasets(response.datasets || []);
+      setTotalCount(response.total_count || 0);
     } catch (err) {
       console.error('Failed to load datasets:', err);
       setError('Failed to load datasets');
@@ -72,6 +74,7 @@ export const useDatasets = (workspaceId?: number) => {
 
   return {
     datasets,
+    totalCount,
     isLoading,
     error,
     loadDatasets,

@@ -16,7 +16,7 @@ import type { CreateProjectRequest } from '../../types';
 export const ProjectPage: React.FC = () => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { workspaces } = useWorkspaces();
-  const { projects, isLoading, createProject } = useProjects(workspaceId);
+  const { projects, totalCount, isLoading, createProject } = useProjects(workspaceId);
   const [createMode, setCreateMode] = useState(false);
 
   const workspace = workspaceId ? workspaces.find(w => w.id === parseInt(workspaceId)) : null;
@@ -95,14 +95,14 @@ export const ProjectPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <StatCard
               title="Total Projects"
-              value={projects.length}
+              value={totalCount}
               icon={FolderIcon}
               iconColor="text-white"
               iconBgColor="bg-blue-500"
             />
             <StatCard
               title="Active Projects"
-              value={projects.length} // You can add status logic here
+              value={totalCount} // You can add status logic here
               icon={EyeIcon}
               iconColor="text-white"
               iconBgColor="bg-green-500"
@@ -195,7 +195,7 @@ export const ProjectPage: React.FC = () => {
             <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-100">
               <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
                 <FolderIcon className="h-6 w-6 text-green-600 mr-2" />
-                All Projects ({projects.length})
+                All Projects ({totalCount})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
