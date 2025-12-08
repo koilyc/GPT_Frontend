@@ -20,7 +20,7 @@ export const useTrainingJobs = (workspaceId?: number) => {
 
     try {
       const response: TrainingJobListResponse = await trainingJobAPI.getByWorkspace(workspaceId, {
-        limit: 10,
+        limit: 100,
         order_by: 'created_at',
         desc: true,
         ...params
@@ -109,7 +109,7 @@ export const useProjectTrainingJobs = (workspaceId?: number, projectId?: number)
 
     try {
       const response: TrainingJobListResponse = await trainingJobAPI.getByProject(workspaceId, projectId, {
-        limit: 10,
+        limit: 100,
         order_by: 'created_at',
         desc: true,
         ...params
