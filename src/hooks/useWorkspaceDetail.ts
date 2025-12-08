@@ -30,8 +30,8 @@ export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailRetur
       
       const [workspaceData, projectsResponse, datasetsResponse] = await Promise.all([
         workspaceAPI.getById(workspaceId),
-        projectAPI.getAll(workspaceId),
-        datasetAPI.getAll(workspaceId)
+        projectAPI.getAll(workspaceId, { limit: 100, offset: 0 }),
+        datasetAPI.getAll(workspaceId, { limit: 100, offset: 0 })
       ]);
 
       setWorkspace(workspaceData);

@@ -14,7 +14,7 @@ export const useProjects = (workspaceId?: number) => {
       setIsLoading(true);
       setError(null);
       
-      const response: ProjectListResponse = await projectAPI.getAll(workspaceId);
+      const response: ProjectListResponse = await projectAPI.getAll(workspaceId, { limit: 100, offset: 0 });
       setProjects(response.projects || []);
     } catch (err) {
       console.error('Failed to load projects:', err);

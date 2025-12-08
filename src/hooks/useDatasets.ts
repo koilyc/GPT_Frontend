@@ -14,7 +14,7 @@ export const useDatasets = (workspaceId?: number) => {
       setIsLoading(true);
       setError(null);
       
-      const response: DatasetListResponse = await datasetAPI.getAll(workspaceId);
+      const response: DatasetListResponse = await datasetAPI.getAll(workspaceId, { limit: 100, offset: 0 });
       setDatasets(response.datasets || []);
     } catch (err) {
       console.error('Failed to load datasets:', err);
