@@ -11,6 +11,7 @@ import { ProjectDetailPage } from './components/project/ProjectDetailPage';
 import { DatasetPage } from './components/dataset/DatasetPage';
 import { DatasetDetailPage } from './components/dataset/DatasetDetailPage';
 import { ImageManagementPage } from './components/image/ImageManagementPage';
+import { AnnotationPage } from './components/annotation/AnnotationPage';
 import { NotificationsPage } from './components/notifications/NotificationsPage';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -96,6 +97,16 @@ function App() {
                 <ProtectedRoute>
                   <ErrorBoundary>
                     <ProjectDetailPage />
+                  </ErrorBoundary>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/workspaces/:workspaceId/projects/:projectId/annotate" 
+              element={
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <AnnotationPage />
                   </ErrorBoundary>
                 </ProtectedRoute>
               } 
