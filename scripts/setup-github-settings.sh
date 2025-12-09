@@ -31,7 +31,12 @@ if ! gh auth status &> /dev/null; then
 fi
 
 # Get repository information
-REPO_INFO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+REPO_INFO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+if [ -z "$REPO_INFO" ]; then
+    echo -e "${RED}Error: Could not get repository information.${NC}"
+    echo "Make sure you're running this script from within a repository directory."
+    exit 1
+fi
 echo -e "Repository: ${GREEN}${REPO_INFO}${NC}"
 echo ""
 
@@ -56,8 +61,12 @@ check_setting() {
     local setting_name=$1
     local setting_key=$2
     
-    local current_value=$(gh api repos/${REPO_INFO} --jq .${setting_key})
-    echo -e "${setting_name}: ${YELLOW}${current_value}${NC}"
+    local current_value=$(gh api repos/${REPO_INFO} --jq .${setting_key} 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$current_value" ]; then
+        echo -e "${setting_name}: ${RED}[Error reading value]${NC}"
+    else
+        echo -e "${setting_name}: ${YELLOW}${current_value}${NC}"
+    fi
 }
 
 echo "Current Settings:"
