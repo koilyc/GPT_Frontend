@@ -1151,42 +1151,44 @@ export const WorkspaceDetailPage: React.FC = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
-        <div className="max-w-7xl mx-auto p-6">
-          {/* Breadcrumb Navigation */}
-          <div className="flex items-center justify-between mb-6">
-            <Breadcrumb 
-              items={[
-                { label: 'Workspaces', href: '/workspaces' },
-                { label: workspace.name, active: true }
-              ]}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/workspaces')}
-              className="flex items-center space-x-2"
-            >
-              <ArrowLeftIcon className="w-4 h-4" />
-              <span>Back to Workspaces</span>
-            </Button>
-          </div>
-
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{workspace.name}</h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">{workspace.description || 'Workspace details and management'}</p>
-              </div>
-              <Button variant="outline" className="flex items-center space-x-2">
-                <SettingsIcon className="w-4 h-4" />
-                <span>Settings</span>
+        {/* Sticky Header Container */}
+        <div className="sticky top-0 z-40 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="max-w-7xl mx-auto px-6 pt-6">
+            {/* Breadcrumb Navigation */}
+            <div className="flex items-center justify-between mb-4">
+              <Breadcrumb 
+                items={[
+                  { label: 'Workspaces', href: '/workspaces' },
+                  { label: workspace.name, active: true }
+                ]}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/workspaces')}
+                className="flex items-center space-x-2"
+              >
+                <ArrowLeftIcon className="w-4 h-4" />
+                <span>Back to Workspaces</span>
               </Button>
             </div>
-          </div>
 
-          {/* Tabs */}
-          <div className="border-b border-gray-200 dark:border-gray-700 mb-6 overflow-hidden">
+            {/* Header */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{workspace.name}</h1>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">{workspace.description || 'Workspace details and management'}</p>
+                </div>
+                <Button variant="outline" className="flex items-center space-x-2">
+                  <SettingsIcon className="w-4 h-4" />
+                  <span>Settings</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="border-b border-gray-200 dark:border-gray-700 overflow-hidden">
             <nav className="flex space-x-8 min-w-0">
               {tabs.map((tab) => (
                 <button
