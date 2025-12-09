@@ -41,6 +41,17 @@ interface CreateDatasetForm {
   description: string;
 }
 
+// Helper function for project type abbreviations
+const getProjectTypeAbbreviation = (type: string): string => {
+  const abbreviations: Record<string, string> = {
+    classification: 'CLS',
+    detection: 'DET',
+    segmentation: 'SEG',
+    anomaly: 'ANO'
+  };
+  return abbreviations[type] || type.substring(0, 3).toUpperCase();
+};
+
 export const WorkspaceDetailPage: React.FC = () => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
@@ -476,6 +487,7 @@ export const WorkspaceDetailPage: React.FC = () => {
         onClick={() => setCreateProjectMode(true)}
         className="fixed right-8 bottom-24 z-30 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110"
         title="New Project"
+        aria-label="New Project"
       >
         <PlusIcon className="w-6 h-6" />
       </button>
@@ -548,7 +560,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                     ? 'bg-gradient-to-r from-red-100 to-red-200 dark:from-red-900/40 dark:to-red-800/40 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700'
                     : 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'
                 }`}>
-                  {project.type === 'classification' ? 'CLS' : project.type === 'detection' ? 'DET' : project.type === 'segmentation' ? 'SEG' : project.type === 'anomaly' ? 'ANO' : project.type.substring(0, 3).toUpperCase()}
+                  {getProjectTypeAbbreviation(project.type)}
                 </span>
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-1">{project.name}</h3>
@@ -617,6 +629,7 @@ export const WorkspaceDetailPage: React.FC = () => {
         onClick={() => setCreateDatasetMode(true)}
         className="fixed right-8 bottom-24 z-30 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110"
         title="New Dataset"
+        aria-label="New Dataset"
       >
         <PlusIcon className="w-6 h-6" />
       </button>
