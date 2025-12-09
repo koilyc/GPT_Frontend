@@ -1189,33 +1189,38 @@ export const WorkspaceDetailPage: React.FC = () => {
 
             {/* Tabs */}
             <div className="border-b border-gray-200 dark:border-gray-700 overflow-hidden">
-            <nav className="flex space-x-8 min-w-0">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <tab.icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="flex-shrink-0">{tab.label}</span>
-                  {tab.count !== null && (
-                    <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+              <nav className="flex space-x-8 min-w-0">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
                       activeTab === tab.id
-                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <tab.icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="flex-shrink-0">{tab.label}</span>
+                    {tab.count !== null && (
+                      <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                        activeTab === tab.id
+                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                      }`}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+            </div>
           </div>
+        </div>
+        {/* End Sticky Header */}
 
+        {/* Scrollable Content */}
+        <div className="max-w-7xl mx-auto p-6">
           {/* Tab Content */}
           {renderTabContent()}
         </div>
