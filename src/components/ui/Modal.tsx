@@ -26,6 +26,16 @@ export const Modal: React.FC<ModalProps> = ({
   // Track if this modal instance has contributed to the count
   const hasIncrementedCount = useRef(false);
 
+  // Accessibility warning in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && !title && !ariaLabel) {
+      console.warn(
+        'Modal: Either "title" or "ariaLabel" prop should be provided for accessibility. ' +
+        'Screen readers need a way to identify the modal dialog.'
+      );
+    }
+  }, [title, ariaLabel]);
+
   // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
