@@ -401,8 +401,10 @@ export const DatasetDetailPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Stats Overview */}
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <StatCard
               title="Total Images"
@@ -610,6 +612,7 @@ export const DatasetDetailPage: React.FC = () => {
               />
             )}
           </Card>
+          </div>
         </div>
 
         {/* Image Preview Modal */}
@@ -639,7 +642,6 @@ export const DatasetDetailPage: React.FC = () => {
             </div>
           </div>
         )}
-        </div>
       </div>
     </Layout>
   );
