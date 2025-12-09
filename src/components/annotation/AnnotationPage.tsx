@@ -40,9 +40,9 @@ export const AnnotationPage: React.FC = () => {
   const navigate = useNavigate();
   
   const [project, setProject] = useState<Project | null>(null);
-  const [images, setImages] = useState<Image[]>([]);
+  const [images, setImages] = useState<{ id: number; image_id: number }[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [currentImage, setCurrentImage] = useState<Image | null>(null);
+  const [currentImage, setCurrentImage] = useState<{ id: number; image_id: number } | null>(null);
   const [imageUrl, setImageUrl] = useState<string>('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -85,9 +85,10 @@ export const AnnotationPage: React.FC = () => {
         setSelectedCategoryId(categoryList[0].id);
       }
 
-      // Fetch all images in batches
+      // Fetch all project images in batches
+      // Note: ProjectImage contains id and image_id, not full image data
       const batchSize = 100;
-      let allImages: Image[] = [];
+      let allImages: { id: number; image_id: number }[] = [];
       let offset = 0;
       let hasMore = true;
       while (hasMore) {
@@ -97,7 +98,7 @@ export const AnnotationPage: React.FC = () => {
           { limit: batchSize, offset }
         );
         const batch = imagesData.Images || [];
-        allImages = allImages.concat(batch as unknown as Image[]);
+        allImages = allImages.concat(batch.map(img => ({ id: img.id, image_id: img.image_id })));
         if (batch.length < batchSize) {
           hasMore = false;
         } else {
@@ -112,14 +113,16 @@ export const AnnotationPage: React.FC = () => {
     }
   }, [workspaceId, projectId]);
 
-  const loadImageUrl = useCallback(async (image: Image) => {
-    if (!image) return;
+  const loadImageUrl = useCallback(async (imageId: number) => {
+    if (!imageId) return;
     
     try {
       // TODO: Implement proper image URL loading once API endpoint is available
-      // For now, construct URL from image path
-      const baseURL = import.meta.env.VITE_API_URL || '';
-      setImageUrl(`${baseURL}${image.path || ''}`);
+      // Current limitation: We only have image_id from ProjectImage, not the full image data with path
+      // This is a placeholder that will need to be implemented when the backend provides
+      // an endpoint to get image details by image_id or project_id+image_id
+      setImageUrl('');
+      console.warn('Image URL loading not yet implemented - need API endpoint to fetch image by image_id');
     } catch (error) {
       console.error('Failed to load image URL:', error);
     }
@@ -279,9 +282,10 @@ export const AnnotationPage: React.FC = () => {
 
   useEffect(() => {
     if (images.length > 0 && currentImageIndex < images.length) {
-      setCurrentImage(images[currentImageIndex]);
-      loadImageUrl(images[currentImageIndex]);
-      loadAnnotations(images[currentImageIndex].id);
+      const projectImage = images[currentImageIndex];
+      setCurrentImage(projectImage);
+      loadImageUrl(projectImage.image_id);
+      loadAnnotations(projectImage.image_id);
     }
   }, [currentImageIndex, images, loadImageUrl, loadAnnotations]);
 
@@ -457,7 +461,7 @@ export const AnnotationPage: React.FC = () => {
           message="Are you sure you want to clear all annotations?"
           confirmText="Clear All"
           cancelText="Cancel"
-          confirmVariant="destructive"
+          confirmVariant="danger"
         />
         {/* Header */}
         <div className="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">

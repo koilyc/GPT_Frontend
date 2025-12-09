@@ -9,7 +9,7 @@ interface ConfirmDialogProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  confirmVariant?: 'default' | 'destructive';
+  confirmVariant?: 'primary' | 'danger';
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -20,7 +20,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  confirmVariant = 'default',
+  confirmVariant = 'primary',
 }) => {
   if (!isOpen) return null;
 
@@ -55,7 +55,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 onConfirm();
                 onClose();
               }}
-              className={confirmVariant === 'destructive' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+              variant={confirmVariant}
             >
               {confirmText}
             </Button>
