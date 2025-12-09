@@ -116,11 +116,12 @@ export const NotificationsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-auto">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {/* Filters */}
-          <div className="flex items-center justify-between mb-6">
+        {/* Scrollable Content with Fixed Pagination */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-auto">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {/* Filters */}
+            <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <FilterIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               {(['all', 'unread'] as const).map((f) => (
@@ -233,38 +234,41 @@ export const NotificationsPage: React.FC = () => {
             ))}
           </div>
 
-          {notifications.length === 0 && (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <BellIcon className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  No notifications
-                </h3>
-                <p className="text-gray-500 dark:text-gray-400">
-                  {filter === 'unread' 
-                    ? 'All caught up! No unread notifications.' 
-                    : 'You don\'t have any notifications yet.'}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Pagination */}
+              {notifications.length === 0 && (
+                <Card>
+                  <CardContent className="p-12 text-center">
+                    <BellIcon className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                      No notifications
+                    </h3>
+                    <p className="text-gray-500 dark:text-gray-400">
+                      {filter === 'unread' 
+                        ? 'All caught up! No unread notifications.' 
+                        : 'You don\'t have any notifications yet.'}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+          
+          {/* Fixed Pagination */}
           {totalCount > pageSize && (
-            <div className="mt-8">
-              <Pagination
-                currentPage={currentPage}
-                totalCount={totalCount}
-                pageSize={pageSize}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={(newSize) => {
-                  setPageSize(newSize);
-                  setCurrentPage(1);
-                }}
-              />
+            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <Pagination
+                  currentPage={currentPage}
+                  totalCount={totalCount}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(newSize) => {
+                    setPageSize(newSize);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
             </div>
           )}
-          </div>
         </div>
       </div>
     </Layout>

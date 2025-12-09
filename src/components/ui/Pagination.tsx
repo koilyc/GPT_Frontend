@@ -82,11 +82,11 @@ export const Pagination: React.FC<PaginationProps> = ({
   if (totalCount === 0) return null;
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 sm:px-6 gap-4">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 sm:px-6 gap-2">
       {/* 統計信息和控制項 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
         <div className="flex items-center">
-          <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+          <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
             顯示 <span className="font-medium">{startItem}</span> 到{' '}
             <span className="font-medium">{endItem}</span> 筆，共{' '}
             <span className="font-medium">{totalCount}</span> 筆結果
@@ -95,14 +95,14 @@ export const Pagination: React.FC<PaginationProps> = ({
 
         {/* 每頁筆數選擇 */}
         <div className="flex items-center space-x-2">
-          <label htmlFor="pageSize" className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+          <label htmlFor="pageSize" className="text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
             每頁顯示：
           </label>
           <select
             id="pageSize"
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="border-2 border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 pr-8 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-[80px] cursor-pointer"
+            className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 pr-6 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-[70px] cursor-pointer"
           >
             {pageSizeOptions.map(option => (
               <option key={option} value={option}>{option}</option>
@@ -119,10 +119,10 @@ export const Pagination: React.FC<PaginationProps> = ({
           size="sm"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="flex items-center space-x-2 px-3 py-2 min-w-[80px] justify-center"
+          className="flex items-center space-x-1 px-2 py-1 min-w-[70px] justify-center text-xs"
         >
-          <ChevronLeftIcon className="w-4 h-4 flex-shrink-0" />
-          <span className="text-sm">上一頁</span>
+          <ChevronLeftIcon className="w-3 h-3 flex-shrink-0" />
+          <span>上一頁</span>
         </Button>
 
         {/* 頁碼 */}
@@ -134,7 +134,7 @@ export const Pagination: React.FC<PaginationProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onPageChange(1)}
-                className="min-w-[40px] h-[36px] px-3 flex items-center justify-center"
+                className="min-w-[32px] h-[28px] px-2 flex items-center justify-center text-xs"
               >
                 1
               </Button>
@@ -151,7 +151,7 @@ export const Pagination: React.FC<PaginationProps> = ({
               variant={page === currentPage ? "primary" : "outline"}
               size="sm"
               onClick={() => onPageChange(page)}
-              className="min-w-[40px] h-[36px] px-3 flex items-center justify-center"
+              className="min-w-[32px] h-[28px] px-2 flex items-center justify-center text-xs"
             >
               {page}
             </Button>
@@ -167,7 +167,7 @@ export const Pagination: React.FC<PaginationProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onPageChange(totalPages)}
-                className="min-w-[40px] h-[36px] px-3 flex items-center justify-center"
+                className="min-w-[32px] h-[28px] px-2 flex items-center justify-center text-xs"
               >
                 {totalPages}
               </Button>
@@ -181,10 +181,10 @@ export const Pagination: React.FC<PaginationProps> = ({
           size="sm"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="flex items-center space-x-2 px-3 py-2 min-w-[80px] justify-center"
+          className="flex items-center space-x-1 px-2 py-1 min-w-[70px] justify-center text-xs"
         >
-          <span className="text-sm">下一頁</span>
-          <ChevronRightIcon className="w-4 h-4 flex-shrink-0" />
+          <span>下一頁</span>
+          <ChevronRightIcon className="w-3 h-3 flex-shrink-0" />
         </Button>
       </div>
     </div>

@@ -13,6 +13,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { TrainingJobCard } from '../training/TrainingJobCard';
 import { Breadcrumb } from '../ui/Breadcrumb';
 import { Pagination } from '../ui/Pagination';
+import { Modal } from '../ui/Modal';
 import { 
   PlusIcon, 
   FolderIcon, 
@@ -519,54 +520,52 @@ export const WorkspaceDetailPage: React.FC = () => {
         <PlusIcon className="w-6 h-6" />
       </button>
 
-      {createProjectMode && (
-        <Card className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-blue-900/20 border-blue-200 dark:border-blue-700/50">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-blue-100 dark:border-blue-700">
-            <CardTitle className="text-blue-900 dark:text-blue-100">Create New Project</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateProject} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
-                <Input
-                  value={projectForm.name}
-                  onChange={(e) => setProjectForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter project name"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
-                <Input
-                  value={projectForm.description}
-                  onChange={(e) => setProjectForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Enter project description"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Project Type</label>
-                <select
-                  value={projectForm.type}
-                  onChange={(e) => setProjectForm(prev => ({ ...prev, type: e.target.value as any }))}
-                  className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400"
-                >
-                  <option value="classification">Classification</option>
-                  <option value="detection">Object Detection</option>
-                  <option value="segmentation">Segmentation</option>
-                </select>
-              </div>
-              <div className="flex space-x-3">
-                <Button type="submit" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
-                  Create Project
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setCreateProjectMode(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+      <Modal 
+        isOpen={createProjectMode} 
+        onClose={() => setCreateProjectMode(false)}
+        title="Create New Project"
+        size="md"
+      >
+        <form onSubmit={handleCreateProject} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
+            <Input
+              value={projectForm.name}
+              onChange={(e) => setProjectForm(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Enter project name"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+            <Input
+              value={projectForm.description}
+              onChange={(e) => setProjectForm(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Enter project description"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Project Type</label>
+            <select
+              value={projectForm.type}
+              onChange={(e) => setProjectForm(prev => ({ ...prev, type: e.target.value as any }))}
+              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400"
+            >
+              <option value="classification">Classification</option>
+              <option value="detection">Object Detection</option>
+              <option value="segmentation">Segmentation</option>
+            </select>
+          </div>
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={() => setCreateProjectMode(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
+              Create Project
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {projects.length > 0 && (
         <>
@@ -583,7 +582,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                 </span>
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">{project.name}</h3>
-              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">{project.description || 'No description'}</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2 min-h-[40px]">{project.description || 'No description'}</p>
               <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex justify-between">
                   <span>Images:</span>
@@ -643,42 +642,40 @@ export const WorkspaceDetailPage: React.FC = () => {
         <PlusIcon className="w-6 h-6" />
       </button>
 
-      {createDatasetMode && (
-        <Card className="bg-gradient-to-br from-white to-green-50 dark:from-gray-800 dark:to-green-900/20 border-green-200 dark:border-green-700/50">
-          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-b border-green-100 dark:border-green-700">
-            <CardTitle className="text-green-900 dark:text-green-100">Create New Dataset</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateDataset} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
-                <Input
-                  value={datasetForm.name}
-                  onChange={(e) => setDatasetForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter dataset name"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
-                <Input
-                  value={datasetForm.description}
-                  onChange={(e) => setDatasetForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Enter dataset description"
-                />
-              </div>
-              <div className="flex space-x-3">
-                <Button type="submit" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white">
-                  Create Dataset
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setCreateDatasetMode(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+      <Modal 
+        isOpen={createDatasetMode} 
+        onClose={() => setCreateDatasetMode(false)}
+        title="Create New Dataset"
+        size="md"
+      >
+        <form onSubmit={handleCreateDataset} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
+            <Input
+              value={datasetForm.name}
+              onChange={(e) => setDatasetForm(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Enter dataset name"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+            <Input
+              value={datasetForm.description}
+              onChange={(e) => setDatasetForm(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Enter dataset description"
+            />
+          </div>
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={() => setCreateDatasetMode(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white">
+              Create Dataset
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {datasets.length > 0 && (
         <>
@@ -695,7 +692,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                 </span>
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">{dataset.name}</h3>
-              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">{dataset.description || 'No description'}</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2 min-h-[40px]">{dataset.description || 'No description'}</p>
               
               {dataset.project_names && dataset.project_names.length > 0 && (
                 <div className="mb-4">
@@ -1194,8 +1191,8 @@ export const WorkspaceDetailPage: React.FC = () => {
           </div>
           {/* Fixed Pagination Bar at Bottom */}
           {(activeTab === 'projects' || activeTab === 'datasets' || activeTab === 'training-jobs') && (
-            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
-              <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex-shrink-0 bg-white dark:bg-gray-800">
+              <div className="max-w-7xl mx-auto px-6">
                 {activeTab === 'projects' && projectsTotalCount > projectsPageSize && (
                   <Pagination
                     currentPage={projectsPage}
