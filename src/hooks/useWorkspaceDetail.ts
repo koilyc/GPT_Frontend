@@ -5,7 +5,9 @@ import type { Workspace, Project, Dataset } from '../types';
 interface UseWorkspaceDetailReturn {
   workspace: Workspace | null;
   projects: Project[];
+  projectsTotalCount: number;
   datasets: Dataset[];
+  datasetsTotalCount: number;
   loading: boolean;
   error: string | null;
   totalImages: number;
@@ -19,24 +21,34 @@ interface UseWorkspaceDetailReturn {
 export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailReturn => {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsTotalCount, setProjectsTotalCount] = useState(0);
   const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [datasetsTotalCount, setDatasetsTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadWorkspaceData = useCallback(async () => {
+  const loadWorkspaceData = useCallback(async (params?: { limit?: number; offset?: number }) => {
     try {
       setLoading(true);
       setError(null);
       
       const [workspaceData, projectsResponse, datasetsResponse] = await Promise.all([
         workspaceAPI.getById(workspaceId),
-        projectAPI.getAll(workspaceId),
-        datasetAPI.getAll(workspaceId)
+        projectAPI.getAll(workspaceId, { 
+          limit: params?.limit ?? 100, 
+          offset: params?.offset ?? 0 
+        }),
+        datasetAPI.getAll(workspaceId, { 
+          limit: params?.limit ?? 100, 
+          offset: params?.offset ?? 0 
+        })
       ]);
 
       setWorkspace(workspaceData);
       setProjects(projectsResponse.projects || []);
+      setProjectsTotalCount(projectsResponse.total_count || 0);
       setDatasets(datasetsResponse.datasets || []);
+      setDatasetsTotalCount(datasetsResponse.total_count || 0);
 
     } catch (error) {
       console.error('Failed to load workspace data:', error);
@@ -83,7 +95,9 @@ export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailRetur
   return {
     workspace,
     projects,
+    projectsTotalCount,
     datasets,
+    datasetsTotalCount,
     loading,
     error,
     totalImages,

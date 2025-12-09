@@ -4,18 +4,23 @@ import type { Project, CreateProjectRequest, ProjectListResponse } from '../type
 
 export const useProjects = (workspaceId?: number) => {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (params?: { limit?: number; offset?: number }) => {
     if (!workspaceId) return;
     
     try {
       setIsLoading(true);
       setError(null);
       
-      const response: ProjectListResponse = await projectAPI.getAll(workspaceId);
+      const response: ProjectListResponse = await projectAPI.getAll(workspaceId, { 
+        limit: params?.limit ?? 100, 
+        offset: params?.offset ?? 0 
+      });
       setProjects(response.projects || []);
+      setTotalCount(response.total_count || 0);
     } catch (err) {
       console.error('Failed to load projects:', err);
       setError('Failed to load projects');
@@ -67,6 +72,7 @@ export const useProjects = (workspaceId?: number) => {
 
   return {
     projects,
+    totalCount,
     isLoading,
     error,
     loadProjects,
