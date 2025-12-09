@@ -35,7 +35,6 @@ export const Modal: React.FC<ModalProps> = ({
     };
 
     if (isOpen && !hasIncrementedCount.current) {
-      document.addEventListener('keydown', handleEscape);
       // Prevent body scroll when modal is open
       if (openModalCount === 0) {
         originalBodyOverflow = document.body.style.overflow;
