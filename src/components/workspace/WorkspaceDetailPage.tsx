@@ -64,13 +64,13 @@ export const WorkspaceDetailPage: React.FC = () => {
   const [inviteRole, setInviteRole] = useState<'manager' | 'member' | 'viewer'>('member');
   const [inviteLoading, setInviteLoading] = useState(false);
   
-  // Pagination states
+  // Pagination states (4x4 grid = 16 items per page)
   const [projectsPage, setProjectsPage] = useState(1);
-  const [projectsPageSize, setProjectsPageSize] = useState(9);
+  const [projectsPageSize, setProjectsPageSize] = useState(16);
   const [datasetsPage, setDatasetsPage] = useState(1);
-  const [datasetsPageSize, setDatasetsPageSize] = useState(9);
+  const [datasetsPageSize, setDatasetsPageSize] = useState(16);
   const [trainingJobsPage, setTrainingJobsPage] = useState(1);
-  const [trainingJobsPageSize, setTrainingJobsPageSize] = useState(9);
+  const [trainingJobsPageSize, setTrainingJobsPageSize] = useState(16);
   const [createProjectMode, setCreateProjectMode] = useState(false);
   const [createDatasetMode, setCreateDatasetMode] = useState(false);
   const [datasetImageCount, setDatasetImageCount] = useState<Record<number, number>>({});
@@ -510,13 +510,14 @@ export const WorkspaceDetailPage: React.FC = () => {
 
   const renderProjects = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Projects</h2>
-        <Button onClick={() => setCreateProjectMode(true)} className="flex items-center space-x-2">
-          <PlusIcon className="w-4 h-4" />
-          <span>New Project</span>
-        </Button>
-      </div>
+      {/* Floating Action Button */}
+      <button
+        onClick={() => setCreateProjectMode(true)}
+        className="fixed right-8 bottom-24 z-30 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110"
+        title="New Project"
+      >
+        <PlusIcon className="w-6 h-6" />
+      </button>
 
       {createProjectMode && (
         <Card className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-blue-900/20 border-blue-200 dark:border-blue-700/50">
@@ -569,7 +570,7 @@ export const WorkspaceDetailPage: React.FC = () => {
 
       {projects.length > 0 && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {projects.slice((projectsPage - 1) * projectsPageSize, projectsPage * projectsPageSize).map((project) => (
               <Card key={project.id} className="hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-blue-900/20">
             <CardContent className="p-6">
@@ -609,15 +610,6 @@ export const WorkspaceDetailPage: React.FC = () => {
               </Card>
             ))}
           </div>
-          
-          <Pagination
-            currentPage={projectsPage}
-            totalCount={projectsTotalCount}
-            pageSize={projectsPageSize}
-            onPageChange={setProjectsPage}
-            onPageSizeChange={setProjectsPageSize}
-            gridConfig={{ cols: { sm: 1, md: 2, lg: 3, xl: 3 } }}
-          />
         </>
       )}
 
@@ -642,13 +634,14 @@ export const WorkspaceDetailPage: React.FC = () => {
 
   const renderDatasets = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Datasets</h2>
-        <Button onClick={() => setCreateDatasetMode(true)} className="flex items-center space-x-2">
-          <PlusIcon className="w-4 h-4" />
-          <span>New Dataset</span>
-        </Button>
-      </div>
+      {/* Floating Action Button */}
+      <button
+        onClick={() => setCreateDatasetMode(true)}
+        className="fixed right-8 bottom-24 z-30 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110"
+        title="New Dataset"
+      >
+        <PlusIcon className="w-6 h-6" />
+      </button>
 
       {createDatasetMode && (
         <Card className="bg-gradient-to-br from-white to-green-50 dark:from-gray-800 dark:to-green-900/20 border-green-200 dark:border-green-700/50">
@@ -689,7 +682,7 @@ export const WorkspaceDetailPage: React.FC = () => {
 
       {datasets.length > 0 && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {datasets.slice((datasetsPage - 1) * datasetsPageSize, datasetsPage * datasetsPageSize).map((dataset) => (
               <Card key={dataset.id} className="hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-green-50 dark:from-gray-800 dark:to-green-900/20">
             <CardContent className="p-6">
@@ -751,15 +744,6 @@ export const WorkspaceDetailPage: React.FC = () => {
               </Card>
             ))}
           </div>
-          
-          <Pagination
-            currentPage={datasetsPage}
-            totalCount={datasetsTotalCount}
-            pageSize={datasetsPageSize}
-            onPageChange={setDatasetsPage}
-            onPageSizeChange={setDatasetsPageSize}
-            gridConfig={{ cols: { sm: 1, md: 2, lg: 3, xl: 3 } }}
-          />
         </>
       )}
 
@@ -784,16 +768,6 @@ export const WorkspaceDetailPage: React.FC = () => {
 
   const renderTrainingJobs = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Training Jobs</h2>
-        <Button 
-          onClick={() => navigate(`/workspaces/${workspaceId}/projects`)} 
-          className="flex items-center space-x-2"
-        >
-          <PlusIcon className="w-4 h-4" />
-          <span>New Training Job</span>
-        </Button>
-      </div>
 
       {trainingJobsLoading ? (
         <Card>
@@ -819,7 +793,7 @@ export const WorkspaceDetailPage: React.FC = () => {
         </Card>
       ) : trainingJobs && trainingJobs.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {trainingJobs.slice((trainingJobsPage - 1) * trainingJobsPageSize, trainingJobsPage * trainingJobsPageSize).map((job) => (
               <TrainingJobCard
                 key={job.id}
@@ -828,15 +802,6 @@ export const WorkspaceDetailPage: React.FC = () => {
               />
             ))}
           </div>
-          
-          <Pagination
-            currentPage={trainingJobsPage}
-            totalCount={trainingJobsTotalCount}
-            pageSize={trainingJobsPageSize}
-            onPageChange={setTrainingJobsPage}
-            onPageSizeChange={setTrainingJobsPageSize}
-            gridConfig={{ cols: { sm: 1, md: 2, lg: 3, xl: 3 } }}
-          />
         </>
       ) : (
         <Card>
@@ -1219,12 +1184,51 @@ export const WorkspaceDetailPage: React.FC = () => {
         </div>
         {/* End Fixed Header */}
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-auto">
-          <div className="max-w-7xl mx-auto p-6">
-            {/* Tab Content */}
-            {renderTabContent()}
+        {/* Scrollable Content with Fixed Pagination */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-auto">
+            <div className="max-w-7xl mx-auto p-6">
+              {/* Tab Content */}
+              {renderTabContent()}
+            </div>
           </div>
+          {/* Fixed Pagination Bar at Bottom */}
+          {(activeTab === 'projects' || activeTab === 'datasets' || activeTab === 'training-jobs') && (
+            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+              <div className="max-w-7xl mx-auto px-6 py-4">
+                {activeTab === 'projects' && projectsTotalCount > projectsPageSize && (
+                  <Pagination
+                    currentPage={projectsPage}
+                    totalCount={projectsTotalCount}
+                    pageSize={projectsPageSize}
+                    onPageChange={setProjectsPage}
+                    onPageSizeChange={setProjectsPageSize}
+                    gridConfig={{ cols: { sm: 1, md: 2, lg: 4, xl: 4 } }}
+                  />
+                )}
+                {activeTab === 'datasets' && datasetsTotalCount > datasetsPageSize && (
+                  <Pagination
+                    currentPage={datasetsPage}
+                    totalCount={datasetsTotalCount}
+                    pageSize={datasetsPageSize}
+                    onPageChange={setDatasetsPage}
+                    onPageSizeChange={setDatasetsPageSize}
+                    gridConfig={{ cols: { sm: 1, md: 2, lg: 4, xl: 4 } }}
+                  />
+                )}
+                {activeTab === 'training-jobs' && trainingJobsTotalCount > trainingJobsPageSize && (
+                  <Pagination
+                    currentPage={trainingJobsPage}
+                    totalCount={trainingJobsTotalCount}
+                    pageSize={trainingJobsPageSize}
+                    onPageChange={setTrainingJobsPage}
+                    onPageSizeChange={setTrainingJobsPageSize}
+                    gridConfig={{ cols: { sm: 1, md: 2, lg: 4, xl: 4 } }}
+                  />
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Layout>
