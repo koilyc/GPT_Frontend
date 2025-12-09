@@ -8,14 +8,17 @@ export const useDatasets = (workspaceId?: number) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDatasets = useCallback(async () => {
+  const loadDatasets = useCallback(async (params?: { limit?: number; offset?: number }) => {
     if (!workspaceId) return;
     
     try {
       setIsLoading(true);
       setError(null);
       
-      const response: DatasetListResponse = await datasetAPI.getAll(workspaceId, { limit: 100, offset: 0 });
+      const response: DatasetListResponse = await datasetAPI.getAll(workspaceId, { 
+        limit: params?.limit ?? 100, 
+        offset: params?.offset ?? 0 
+      });
       setDatasets(response.datasets || []);
       setTotalCount(response.total_count || 0);
     } catch (err) {

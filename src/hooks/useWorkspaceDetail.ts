@@ -27,15 +27,21 @@ export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailRetur
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadWorkspaceData = useCallback(async () => {
+  const loadWorkspaceData = useCallback(async (params?: { limit?: number; offset?: number }) => {
     try {
       setLoading(true);
       setError(null);
       
       const [workspaceData, projectsResponse, datasetsResponse] = await Promise.all([
         workspaceAPI.getById(workspaceId),
-        projectAPI.getAll(workspaceId, { limit: 100, offset: 0 }),
-        datasetAPI.getAll(workspaceId, { limit: 100, offset: 0 })
+        projectAPI.getAll(workspaceId, { 
+          limit: params?.limit ?? 100, 
+          offset: params?.offset ?? 0 
+        }),
+        datasetAPI.getAll(workspaceId, { 
+          limit: params?.limit ?? 100, 
+          offset: params?.offset ?? 0 
+        })
       ]);
 
       setWorkspace(workspaceData);
