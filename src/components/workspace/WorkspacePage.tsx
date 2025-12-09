@@ -118,11 +118,12 @@ export const WorkspacePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-auto">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {/* Create Workspace Modal */}
-          {createMode && (
+        {/* Scrollable Content with Fixed Pagination */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-auto">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {/* Create Workspace Modal */}
+            {createMode && (
             <Card className="mb-8 shadow-lg border-0 bg-white dark:bg-gray-800">
               <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-gray-100 dark:border-gray-700">
                 <div className="flex items-center justify-between">
@@ -195,60 +196,63 @@ export const WorkspacePage: React.FC = () => {
             </Card>
           )}
 
-          {/* Workspaces Grid */}
-          <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-gray-100 dark:border-gray-700">
-              <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
-                <FolderIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2" />
-                All Workspaces
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {workspaces.length === 0 ? (
-                <div className="p-6">
-                  <EmptyState
-                    icon={FolderIcon}
-                    title="No workspaces found"
-                    description={
-                      params.search 
-                        ? `No workspaces found matching "${params.search}". Try adjusting your search terms.`
-                        : "Create your first workspace to start organizing your AI vision projects and datasets."
-                    }
-                    action={{
-                      label: "Create Your First Workspace",
-                      onClick: () => setCreateMode(true)
-                    }}
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {workspaces.map((workspace) => (
-                        <WorkspaceCard 
-                          key={workspace.id} 
-                          workspace={workspace} 
-                          onWorkspaceClick={addToRecent}
-                        />
-                      ))}
+              {/* Workspaces Grid */}
+              <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-gray-100 dark:border-gray-700">
+                  <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
+                    <FolderIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2" />
+                    All Workspaces
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {workspaces.length === 0 ? (
+                    <div className="p-6">
+                      <EmptyState
+                        icon={FolderIcon}
+                        title="No workspaces found"
+                        description={
+                          params.search 
+                            ? `No workspaces found matching "${params.search}". Try adjusting your search terms.`
+                            : "Create your first workspace to start organizing your AI vision projects and datasets."
+                        }
+                        action={{
+                          label: "Create Your First Workspace",
+                          onClick: () => setCreateMode(true)
+                        }}
+                      />
                     </div>
-                  </div>
-                  
-                  {/* 分頁控制 */}
-                  {totalCount > params.limit! && (
-                    <Pagination
-                      currentPage={params.page || 1}
-                      totalCount={totalCount}
-                      pageSize={params.limit || 12}
-                      onPageChange={goToPage}
-                      onPageSizeChange={changePageSize}
-                    />
+                  ) : (
+                    <div className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {workspaces.map((workspace) => (
+                          <WorkspaceCard 
+                            key={workspace.id} 
+                            workspace={workspace} 
+                            onWorkspaceClick={addToRecent}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </div>
           </div>
+          
+          {/* Fixed Pagination */}
+          {totalCount > params.limit! && (
+            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <Pagination
+                  currentPage={params.page || 1}
+                  totalCount={totalCount}
+                  pageSize={params.limit || 12}
+                  onPageChange={goToPage}
+                  onPageSizeChange={changePageSize}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Layout>

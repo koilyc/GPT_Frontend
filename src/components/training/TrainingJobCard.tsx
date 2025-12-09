@@ -67,25 +67,31 @@ export const TrainingJobCard: React.FC<TrainingJobCardProps> = ({
           </span>
         </div>
         
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">{job.name}</h3>
-        <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-1">{job.name}</h3>
+        <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-1">
           {job.project_name} • {job.project_type}
         </p>
         
-        {job.current_progress !== undefined && job.status === 'running' && (
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
-              <span className="text-sm text-gray-600 dark:text-gray-400">{job.current_progress}%</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-gradient-to-r from-orange-500 to-amber-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${job.current_progress}%` }}
-              />
-            </div>
-          </div>
-        )}
+        {/* Always reserve space for progress bar to keep consistent card height */}
+        <div className="mb-4">
+          {job.current_progress !== undefined && job.status === 'running' ? (
+            <>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">{job.current_progress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-gradient-to-r from-orange-500 to-amber-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${job.current_progress}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            // Reserve space with invisible placeholder to maintain consistent height
+            <div className="h-[40px]" />
+          )}
+        </div>
         
         <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
           <div className="flex justify-between">
