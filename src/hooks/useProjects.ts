@@ -8,14 +8,17 @@ export const useProjects = (workspaceId?: number) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (params?: { limit?: number; offset?: number }) => {
     if (!workspaceId) return;
     
     try {
       setIsLoading(true);
       setError(null);
       
-      const response: ProjectListResponse = await projectAPI.getAll(workspaceId, { limit: 100, offset: 0 });
+      const response: ProjectListResponse = await projectAPI.getAll(workspaceId, { 
+        limit: params?.limit ?? 100, 
+        offset: params?.offset ?? 0 
+      });
       setProjects(response.projects || []);
       setTotalCount(response.total_count || 0);
     } catch (err) {

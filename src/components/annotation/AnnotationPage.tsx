@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeftIcon, 
-  TagIcon, 
   SaveIcon, 
   TrashIcon,
   ZoomInIcon,
   ZoomOutIcon,
-  RotateCwIcon,
   SquareIcon,
   PenToolIcon,
   MousePointerIcon
@@ -16,8 +14,11 @@ import { Layout } from '../layout/Layout';
 import { Button } from '../ui/Button';
 import { Card, CardContent } from '../ui/Card';
 import { LoadingState } from '../ui/LoadingState';
-import { projectAPI, imageAPI, categoryAPI, annotationAPI } from '../../api';
-import type { Project, Image, Category, GeneralAnnotation, Annotation } from '../../types';
+import { ToastContainer } from '../ui/ToastContainer';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { useToast } from '../../hooks/useToast';
+import { projectAPI, categoryAPI, annotationAPI } from '../../api';
+import type { Project, Image, Category, GeneralAnnotation } from '../../types';
 
 type ToolType = 'select' | 'bbox' | 'polygon';
 
@@ -48,7 +49,6 @@ export const AnnotationPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   
   // Annotation state
-  const [annotations, setAnnotations] = useState<Annotation | null>(null);
   const [currentTool, setCurrentTool] = useState<ToolType>('select');
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentBBox, setCurrentBBox] = useState<Partial<BBox> | null>(null);
@@ -59,62 +59,73 @@ export const AnnotationPage: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const [scale, setScale] = useState(1);
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; onConfirm: () => void }>({
+    isOpen: false,
+    onConfirm: () => {},
+  });
+  
+  const { toasts, removeToast, success, error: showError } = useToast();
 
-  useEffect(() => {
-    loadData();
-  }, [workspaceId, projectId]);
-
-  useEffect(() => {
-    if (images.length > 0 && currentImageIndex < images.length) {
-      setCurrentImage(images[currentImageIndex]);
-      loadImageUrl(images[currentImageIndex].id);
-      loadAnnotations(images[currentImageIndex].id);
-    }
-  }, [currentImageIndex, images]);
-
-  useEffect(() => {
-    if (imageUrl && canvasRef.current) {
-      drawCanvas();
-    }
-  }, [imageUrl, bboxes, polygons, currentBBox, currentPolygon, scale]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!workspaceId || !projectId) return;
     
     try {
       setLoading(true);
-      const [projectData, imagesData, categoriesData] = await Promise.all([
+      // Fetch project and categories in parallel
+      const [projectData, categoriesData] = await Promise.all([
         projectAPI.getById(parseInt(workspaceId), parseInt(projectId)),
-        projectAPI.getImages(parseInt(workspaceId), parseInt(projectId), { limit: 100 }),
         categoryAPI.getAll(parseInt(workspaceId), parseInt(projectId))
       ]);
       
       setProject(projectData);
-      setImages(imagesData.images || []);
-      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      const categoryList = Array.isArray(categoriesData) ? categoriesData : [];
+      setCategories(categoryList);
       
-      if (categoriesData.length > 0) {
-        setSelectedCategoryId(categoriesData[0].id);
+      if (categoryList.length > 0) {
+        setSelectedCategoryId(categoryList[0].id);
       }
+
+      // Fetch all images in batches
+      const batchSize = 100;
+      let allImages: Image[] = [];
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const imagesData = await projectAPI.getImages(
+          parseInt(workspaceId),
+          parseInt(projectId),
+          { limit: batchSize, offset }
+        );
+        const batch = imagesData.Images || [];
+        allImages = allImages.concat(batch as unknown as Image[]);
+        if (batch.length < batchSize) {
+          hasMore = false;
+        } else {
+          offset += batchSize;
+        }
+      }
+      setImages(allImages);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [workspaceId, projectId]);
 
-  const loadImageUrl = async (imageId: number) => {
-    if (!workspaceId || !projectId) return;
+  const loadImageUrl = useCallback(async (image: Image) => {
+    if (!image) return;
     
     try {
-      const urlData = await imageAPI.getImageUrl(parseInt(workspaceId), parseInt(projectId), imageId);
-      setImageUrl(urlData.url);
+      // TODO: Implement proper image URL loading once API endpoint is available
+      // For now, construct URL from image path
+      const baseURL = import.meta.env.VITE_API_URL || '';
+      setImageUrl(`${baseURL}${image.path || ''}`);
     } catch (error) {
       console.error('Failed to load image URL:', error);
     }
-  };
+  }, []);
 
-  const loadAnnotations = async (imageId: number) => {
+  const loadAnnotations = useCallback(async (imageId: number) => {
     if (!workspaceId || !projectId) return;
     
     try {
@@ -123,7 +134,6 @@ export const AnnotationPage: React.FC = () => {
         parseInt(projectId), 
         imageId
       );
-      setAnnotations(annotationData);
       
       // Parse existing annotations
       const newBboxes: BBox[] = [];
@@ -147,13 +157,12 @@ export const AnnotationPage: React.FC = () => {
       setPolygons(newPolygons);
     } catch (error) {
       console.error('Failed to load annotations:', error);
-      setAnnotations(null);
       setBboxes([]);
       setPolygons([]);
     }
-  };
+  }, [workspaceId, projectId]);
 
-  const drawCanvas = () => {
+  const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imageRef.current;
     if (!canvas || !img || !imageUrl) return;
@@ -262,12 +271,30 @@ export const AnnotationPage: React.FC = () => {
         ctx.fill();
       });
     }
-  };
+  }, [imageUrl, bboxes, polygons, currentBBox, currentPolygon, scale, categories, selectedCategoryId]);
+  
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    if (images.length > 0 && currentImageIndex < images.length) {
+      setCurrentImage(images[currentImageIndex]);
+      loadImageUrl(images[currentImageIndex]);
+      loadAnnotations(images[currentImageIndex].id);
+    }
+  }, [currentImageIndex, images, loadImageUrl, loadAnnotations]);
+
+  useEffect(() => {
+    if (imageUrl && canvasRef.current) {
+      drawCanvas();
+    }
+  }, [imageUrl, drawCanvas]);
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (currentTool === 'select') return;
     if (!selectedCategoryId) {
-      alert('Please select a category first');
+      showError('Please select a category first');
       return;
     }
 
@@ -275,8 +302,8 @@ export const AnnotationPage: React.FC = () => {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / scale;
-    const y = (e.clientY - rect.top) / scale;
+    const x = ((e.clientX - rect.left) / rect.width * canvas.width) / scale;
+    const y = ((e.clientY - rect.top) / rect.height * canvas.height) / scale;
 
     if (currentTool === 'bbox') {
       setIsDrawing(true);
@@ -293,8 +320,8 @@ export const AnnotationPage: React.FC = () => {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / scale;
-    const y = (e.clientY - rect.top) / scale;
+    const x = ((e.clientX - rect.left) / rect.width * canvas.width) / scale;
+    const y = ((e.clientY - rect.top) / rect.height * canvas.height) / scale;
 
     setCurrentBBox({
       ...currentBBox,
@@ -358,20 +385,23 @@ export const AnnotationPage: React.FC = () => {
         { data: annotationData }
       );
 
-      alert('Annotations saved successfully!');
+      success('Annotations saved successfully!');
     } catch (error) {
       console.error('Failed to save annotations:', error);
-      alert('Failed to save annotations');
+      showError('Failed to save annotations');
     }
   };
 
   const handleClearAll = () => {
-    if (confirm('Are you sure you want to clear all annotations?')) {
-      setBboxes([]);
-      setPolygons([]);
-      setCurrentBBox(null);
-      setCurrentPolygon([]);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      onConfirm: () => {
+        setBboxes([]);
+        setPolygons([]);
+        setCurrentBBox(null);
+        setCurrentPolygon([]);
+      },
+    });
   };
 
   const handleNextImage = () => {
@@ -417,9 +447,20 @@ export const AnnotationPage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gray-50">
+      <div className="flex flex-col h-full bg-gray-50">
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+          onConfirm={confirmDialog.onConfirm}
+          title="Clear All Annotations"
+          message="Are you sure you want to clear all annotations?"
+          confirmText="Clear All"
+          cancelText="Cancel"
+          confirmVariant="destructive"
+        />
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
           <div className="max-w-full mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -465,7 +506,7 @@ export const AnnotationPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex h-[calc(100vh-80px)]">
+        <div className="flex flex-1 overflow-hidden">
           {/* Sidebar */}
           <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
             <div className="p-4 space-y-4">
@@ -474,21 +515,21 @@ export const AnnotationPage: React.FC = () => {
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Tools</h3>
                 <div className="grid grid-cols-3 gap-2">
                   <Button
-                    variant={currentTool === 'select' ? 'default' : 'outline'}
+                    variant={currentTool === 'select' ? 'primary' : 'outline'}
                     className="w-full"
                     onClick={() => setCurrentTool('select')}
                   >
                     <MousePointerIcon className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={currentTool === 'bbox' ? 'default' : 'outline'}
+                    variant={currentTool === 'bbox' ? 'primary' : 'outline'}
                     className="w-full"
                     onClick={() => setCurrentTool('bbox')}
                   >
                     <SquareIcon className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={currentTool === 'polygon' ? 'default' : 'outline'}
+                    variant={currentTool === 'polygon' ? 'primary' : 'outline'}
                     className="w-full"
                     onClick={() => setCurrentTool('polygon')}
                   >
