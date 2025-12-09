@@ -169,6 +169,7 @@ export const Sidebar: React.FC = () => {
                   to="/settings"
                   className="rounded-full bg-gray-800 p-2 hover:bg-gray-700"
                   title={user?.username || user?.email}
+                  aria-label={`Settings for ${user?.username || user?.email}`}
                 >
                   <UserIcon className="h-6 w-6 text-white" />
                 </Link>
