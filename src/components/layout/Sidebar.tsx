@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useAuthStore, useAppStore } from '../../store';
+import { useAuthStore } from '../../store';
 import { Button } from '../ui/Button';
 import { QuickNav } from '../ui/QuickNav';
 import { 
@@ -17,7 +17,6 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams<{ workspaceId?: string; projectId?: string }>();
   const { user, logout } = useAuthStore();
-  const { currentWorkspace, currentProject } = useAppStore();
   
   const currentWorkspaceId = params.workspaceId ? parseInt(params.workspaceId) : undefined;
   const currentProjectId = params.projectId ? parseInt(params.projectId) : undefined;
@@ -132,23 +131,6 @@ export const Sidebar: React.FC = () => {
           </li>
 
           {/* Current Context - Hidden since QuickNav is always visible */}
-          {false && currentWorkspace && (
-            <li>
-              <div className="text-xs font-semibold leading-6 text-gray-400">
-                Current Context
-              </div>
-              <div className="mt-2 space-y-1">
-                <div className="text-sm text-white truncate">
-                  📁 {currentWorkspace.name}
-                </div>
-                {currentProject && (
-                  <div className="text-sm text-gray-300 truncate pl-4">
-                    📊 {currentProject.name}
-                  </div>
-                )}
-              </div>
-            </li>
-          )}
 
           {/* User section */}
           <li className="mt-auto">

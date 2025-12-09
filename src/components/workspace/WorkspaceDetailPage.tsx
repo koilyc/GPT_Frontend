@@ -837,23 +837,20 @@ export const WorkspaceDetailPage: React.FC = () => {
           />
         </>
       ) : (
-        // Only show empty state if we're not loading and there's no error
-        !trainingJobsLoading && !trainingJobsError && (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Zap className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No training jobs yet</h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-4">Create your first training job to start training AI models for your projects.</p>
-              <Button 
-                onClick={() => navigate(`/workspaces/${workspaceId}/projects`)}
-                className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white"
-              >
-                <PlusIcon className="w-4 h-4 mr-2" />
-                Start Training
-              </Button>
-            </CardContent>
-          </Card>
-        )
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Zap className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No training jobs yet</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">Create your first training job to start training AI models for your projects.</p>
+            <Button 
+              onClick={() => navigate(`/workspaces/${workspaceId}/projects`)}
+              className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white"
+            >
+              <PlusIcon className="w-4 h-4 mr-2" />
+              Start Training
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
