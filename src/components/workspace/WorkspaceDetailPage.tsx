@@ -533,7 +533,7 @@ export const WorkspaceDetailPage: React.FC = () => {
             {projects.slice((projectsPage - 1) * projectsPageSize, projectsPage * projectsPageSize).map((project) => (
               <Card key={project.id} className="hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-blue-900/20">
             <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 rounded-lg shadow-sm">
                   <BrainIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
@@ -542,24 +542,37 @@ export const WorkspaceDetailPage: React.FC = () => {
                     ? 'bg-gradient-to-r from-purple-100 to-purple-200 dark:from-purple-900/40 dark:to-purple-800/40 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700'
                     : project.type === 'detection'
                     ? 'bg-gradient-to-r from-orange-100 to-orange-200 dark:from-orange-900/40 dark:to-orange-800/40 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-700'
-                    : 'bg-gradient-to-r from-cyan-100 to-cyan-200 dark:from-cyan-900/40 dark:to-cyan-800/40 text-cyan-800 dark:text-cyan-300 border-cyan-300 dark:border-cyan-700'
+                    : project.type === 'segmentation'
+                    ? 'bg-gradient-to-r from-cyan-100 to-cyan-200 dark:from-cyan-900/40 dark:to-cyan-800/40 text-cyan-800 dark:text-cyan-300 border-cyan-300 dark:border-cyan-700'
+                    : project.type === 'anomaly'
+                    ? 'bg-gradient-to-r from-red-100 to-red-200 dark:from-red-900/40 dark:to-red-800/40 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700'
+                    : 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'
                 }`}>
-                  {project.type === 'classification' ? 'CLS' : project.type === 'detection' ? 'DET' : 'SEG'}
+                  {project.type === 'classification' ? 'CLS' : project.type === 'detection' ? 'DET' : project.type === 'segmentation' ? 'SEG' : project.type === 'anomaly' ? 'ANO' : project.type.substring(0, 3).toUpperCase()}
                 </span>
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 line-clamp-1">{project.name}</h3>
               <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2 min-h-[40px]">{project.description || 'No description'}</p>
               <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex justify-between">
-                  <span>Images:</span>
-                  <span>{project.image_count}</span>
+                  <span className="flex items-center">
+                    <ImageIcon className="w-4 h-4 mr-1 text-blue-500" />
+                    Images:
+                  </span>
+                  <span className="font-medium">{project.image_count}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Tasks:</span>
-                  <span>{project.task_count}</span>
+                  <span className="flex items-center">
+                    <Zap className="w-4 h-4 mr-1 text-orange-500" />
+                    Tasks:
+                  </span>
+                  <span className="font-medium">{project.task_count}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Owner:</span>
+                  <span className="flex items-center">
+                    <UsersIcon className="w-4 h-4 mr-1 text-gray-500" />
+                    Owner:
+                  </span>
                   <span>User {project.owned_by}</span>
                 </div>
               </div>
@@ -649,7 +662,7 @@ export const WorkspaceDetailPage: React.FC = () => {
             {datasets.slice((datasetsPage - 1) * datasetsPageSize, datasetsPage * datasetsPageSize).map((dataset) => (
               <Card key={dataset.id} className="hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-white to-green-50 dark:from-gray-800 dark:to-green-900/20">
             <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start mb-4">
                 <div className="p-3 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40 rounded-lg shadow-sm">
                   <DatabaseIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
                 </div>
