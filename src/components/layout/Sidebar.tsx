@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useAuthStore, useAppStore } from '../../store';
+import { useAuthStore } from '../../store';
 import { Button } from '../ui/Button';
 import { QuickNav } from '../ui/QuickNav';
 import { 
