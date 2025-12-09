@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from '../../utils/cn';
 import { XIcon } from 'lucide-react';
 
@@ -7,6 +7,7 @@ interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
   title?: string;
+  ariaLabel?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
@@ -19,8 +20,12 @@ export const Modal: React.FC<ModalProps> = ({
   onClose, 
   children, 
   title,
+  ariaLabel,
   size = 'md' 
 }) => {
+  // Track if this modal instance has contributed to the count
+  const hasIncrementedCount = useRef(false);
+
   // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -29,7 +34,7 @@ export const Modal: React.FC<ModalProps> = ({
       }
     };
 
-    if (isOpen) {
+    if (isOpen && !hasIncrementedCount.current) {
       document.addEventListener('keydown', handleEscape);
       // Prevent body scroll when modal is open
       if (openModalCount === 0) {
@@ -37,16 +42,31 @@ export const Modal: React.FC<ModalProps> = ({
         document.body.style.overflow = 'hidden';
       }
       openModalCount += 1;
+      hasIncrementedCount.current = true;
+    } else if (!isOpen && hasIncrementedCount.current) {
+      // Modal was closed, decrement count
+      openModalCount = Math.max(0, openModalCount - 1);
+      if (openModalCount === 0 && originalBodyOverflow !== null) {
+        document.body.style.overflow = originalBodyOverflow;
+        originalBodyOverflow = null;
+      }
+      hasIncrementedCount.current = false;
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      if (isOpen) {
+      // Cleanup on unmount: if this modal contributed to count, decrement it
+      if (hasIncrementedCount.current) {
         openModalCount = Math.max(0, openModalCount - 1);
         if (openModalCount === 0 && originalBodyOverflow !== null) {
           document.body.style.overflow = originalBodyOverflow;
           originalBodyOverflow = null;
         }
+        hasIncrementedCount.current = false;
       }
     };
   }, [isOpen, onClose]);
@@ -79,6 +99,7 @@ export const Modal: React.FC<ModalProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby={title ? "modal-title" : undefined}
+          aria-label={!title ? ariaLabel : undefined}
         >
           {/* Header */}
           {title && (
