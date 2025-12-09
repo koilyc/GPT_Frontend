@@ -639,7 +639,6 @@ export const DatasetDetailPage: React.FC = () => {
             </div>
           </div>
         )}
-          </div>
         </div>
       </div>
     </Layout>
