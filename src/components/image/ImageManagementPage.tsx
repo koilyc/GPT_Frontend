@@ -29,7 +29,6 @@ export const ImageManagementPage: React.FC = () => {
     setUploading(true);
     try {
       // Mock upload - replace with actual API call
-      console.log('Uploading files:', selectedFiles);
       // const uploadedImages = await imageAPI.upload(projectId!, selectedFiles);
       // setImages(prev => [...prev, ...uploadedImages]);
       setSelectedFiles(null);
@@ -46,7 +45,6 @@ export const ImageManagementPage: React.FC = () => {
 
     try {
       // Mock delete - replace with actual API call
-      console.log('Deleting image:', imageId);
       // await imageAPI.delete(imageId);
       setImages(prev => prev.filter(img => img.id !== imageId));
     } catch (error) {
