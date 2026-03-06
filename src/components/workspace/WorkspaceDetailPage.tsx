@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 
 const MAX_TRAINING_PAGE_SIZE = 100;
+const DATASET_COUNT_CONCURRENCY = 4;
 
 type BaseSortField = 'id' | 'name' | 'created_at' | 'updated_at';
 type MemberSortField = 'name' | 'email' | 'role' | 'pending' | 'join_time';
@@ -100,6 +101,10 @@ export const WorkspaceDetailPage: React.FC = () => {
   const [createProjectMode, setCreateProjectMode] = useState(false);
   const [createDatasetMode, setCreateDatasetMode] = useState(false);
   const [datasetImageCount, setDatasetImageCount] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    setDatasetImageCount({});
+  }, [workspaceId]);
 
   // Form state
   const [projectForm, setProjectForm] = useState<CreateProjectForm>({
@@ -308,26 +313,41 @@ export const WorkspaceDetailPage: React.FC = () => {
 
   // Load image count for each dataset
   useEffect(() => {
+    let cancelled = false;
+
     const loadDatasetImageCounts = async () => {
       if (!workspaceId || !datasets || datasets.length === 0) return;
-      
+
+      const missingDatasets = datasets.filter((dataset) => datasetImageCount[dataset.id] === undefined);
+      if (missingDatasets.length === 0) return;
+
       const counts: Record<number, number> = {};
-      await Promise.all(
-        datasets.map(async (dataset) => {
-          try {
-            const result = await imageAPI.getAll(parseInt(workspaceId), dataset.id, { limit: 1 });
-            counts[dataset.id] = result.total_count;
-          } catch (error) {
-            console.error(`Failed to load image count for dataset ${dataset.id}:`, error);
-            counts[dataset.id] = 0;
-          }
-        })
-      );
-      setDatasetImageCount(counts);
+      for (let i = 0; i < missingDatasets.length; i += DATASET_COUNT_CONCURRENCY) {
+        const chunk = missingDatasets.slice(i, i + DATASET_COUNT_CONCURRENCY);
+        await Promise.all(
+          chunk.map(async (dataset) => {
+            try {
+              const result = await imageAPI.getAll(parseInt(workspaceId), dataset.id, { limit: 1 });
+              counts[dataset.id] = result.total_count;
+            } catch (error) {
+              console.error(`Failed to load image count for dataset ${dataset.id}:`, error);
+              counts[dataset.id] = 0;
+            }
+          })
+        );
+      }
+
+      if (!cancelled) {
+        setDatasetImageCount((prev) => ({ ...prev, ...counts }));
+      }
     };
 
-    loadDatasetImageCounts();
-  }, [workspaceId, datasets]);
+    void loadDatasetImageCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, datasets, datasetImageCount]);
 
   // Tab configuration
   const tabs = useMemo(() => [
@@ -647,37 +667,6 @@ export const WorkspaceDetailPage: React.FC = () => {
         </form>
       </Modal>
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <select
-              value={projectsSortField}
-              onChange={(e) => {
-                setProjectsSortField(e.target.value as BaseSortField);
-                setProjectsPage(1);
-              }}
-              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            >
-              <option value="created_at">Sort by Created Time</option>
-              <option value="updated_at">Sort by Updated Time</option>
-              <option value="name">Sort by Name</option>
-              <option value="id">Sort by ID</option>
-            </select>
-            <select
-              value={projectsSortDesc ? 'desc' : 'asc'}
-              onChange={(e) => {
-                setProjectsSortDesc(e.target.value === 'desc');
-                setProjectsPage(1);
-              }}
-              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
       {projects.length > 0 && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -808,37 +797,6 @@ export const WorkspaceDetailPage: React.FC = () => {
         </form>
       </Modal>
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <select
-              value={datasetsSortField}
-              onChange={(e) => {
-                setDatasetsSortField(e.target.value as BaseSortField);
-                setDatasetsPage(1);
-              }}
-              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            >
-              <option value="created_at">Sort by Created Time</option>
-              <option value="updated_at">Sort by Updated Time</option>
-              <option value="name">Sort by Name</option>
-              <option value="id">Sort by ID</option>
-            </select>
-            <select
-              value={datasetsSortDesc ? 'desc' : 'asc'}
-              onChange={(e) => {
-                setDatasetsSortDesc(e.target.value === 'desc');
-                setDatasetsPage(1);
-              }}
-              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
       {datasets.length > 0 && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -921,38 +879,6 @@ export const WorkspaceDetailPage: React.FC = () => {
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <select
-              value={trainingJobsSortField}
-              onChange={(e) => {
-                setTrainingJobsSortField(e.target.value as JobSortField);
-                setTrainingJobsPage(1);
-              }}
-              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            >
-              <option value="created_at">Sort by Created Time</option>
-              <option value="updated_at">Sort by Updated Time</option>
-              <option value="name">Sort by Name</option>
-              <option value="time_spent">Sort by Time Spent</option>
-              <option value="id">Sort by ID</option>
-            </select>
-            <select
-              value={trainingJobsSortDesc ? 'desc' : 'asc'}
-              onChange={(e) => {
-                setTrainingJobsSortDesc(e.target.value === 'desc');
-                setTrainingJobsPage(1);
-              }}
-              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
       {trainingJobsLoading ? (
         <Card>
           <CardContent className="p-12 text-center">
@@ -1020,33 +946,6 @@ export const WorkspaceDetailPage: React.FC = () => {
     <div className="space-y-6 h-full flex flex-col">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 flex-shrink-0">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Workspace Members</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full md:w-[480px]">
-          <select
-            value={membersSortField}
-            onChange={(e) => {
-              setMembersSortField(e.target.value as MemberSortField);
-              setMembersPage(1);
-            }}
-            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-          >
-            <option value="join_time">Sort by Join Time</option>
-            <option value="name">Sort by Name</option>
-            <option value="email">Sort by Email</option>
-            <option value="role">Sort by Role</option>
-            <option value="pending">Sort by Pending Status</option>
-          </select>
-          <select
-            value={membersSortDesc ? 'desc' : 'asc'}
-            onChange={(e) => {
-              setMembersSortDesc(e.target.value === 'desc');
-              setMembersPage(1);
-            }}
-            className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-          >
-            <option value="desc">Descending</option>
-            <option value="asc">Ascending</option>
-          </select>
-        </div>
       </div>
 
       {/* Invite Member Form */}
@@ -1184,7 +1083,7 @@ export const WorkspaceDetailPage: React.FC = () => {
       </div>
       
       {/* Fixed Pagination */}
-      {members && members.length > 0 && membersTotalCount > membersPageSize && (
+      {membersTotalCount > 0 && (
         <div className="flex-shrink-0 pt-4">
           <Pagination
             currentPage={membersPage}
@@ -1194,6 +1093,26 @@ export const WorkspaceDetailPage: React.FC = () => {
             onPageSizeChange={(size) => {
               setMembersPageSize(size);
               setMembersPage(1);
+            }}
+            sortControl={{
+              label: 'Order by',
+              options: [
+                { value: 'join_time', label: 'Join Time' },
+                { value: 'name', label: 'Name' },
+                { value: 'email', label: 'Email' },
+                { value: 'role', label: 'Role' },
+                { value: 'pending', label: 'Pending Status' },
+              ],
+              value: membersSortField,
+              onChange: (value) => {
+                setMembersSortField(value as MemberSortField);
+                setMembersPage(1);
+              },
+              desc: membersSortDesc,
+              onToggleDirection: () => {
+                setMembersSortDesc((prev) => !prev);
+                setMembersPage(1);
+              },
             }}
           />
         </div>
@@ -1451,7 +1370,7 @@ export const WorkspaceDetailPage: React.FC = () => {
           {(activeTab === 'projects' || activeTab === 'datasets' || activeTab === 'training-jobs') && (
             <div className="flex-shrink-0 bg-white dark:bg-gray-800">
               <div className="max-w-7xl mx-auto px-6">
-                {activeTab === 'projects' && projectsTotalCount > projectsPageSize && (
+                {activeTab === 'projects' && projectsTotalCount > 0 && (
                   <Pagination
                     currentPage={projectsPage}
                     totalCount={projectsTotalCount}
@@ -1462,9 +1381,28 @@ export const WorkspaceDetailPage: React.FC = () => {
                       setProjectsPage(1);
                     }}
                     gridConfig={{ cols: { sm: 1, md: 2, lg: 4, xl: 4 } }}
+                    sortControl={{
+                      label: 'Order by',
+                      options: [
+                        { value: 'created_at', label: 'Created Time' },
+                        { value: 'updated_at', label: 'Updated Time' },
+                        { value: 'name', label: 'Name' },
+                        { value: 'id', label: 'ID' },
+                      ],
+                      value: projectsSortField,
+                      onChange: (value) => {
+                        setProjectsSortField(value as BaseSortField);
+                        setProjectsPage(1);
+                      },
+                      desc: projectsSortDesc,
+                      onToggleDirection: () => {
+                        setProjectsSortDesc((prev) => !prev);
+                        setProjectsPage(1);
+                      },
+                    }}
                   />
                 )}
-                {activeTab === 'datasets' && datasetsTotalCount > datasetsPageSize && (
+                {activeTab === 'datasets' && datasetsTotalCount > 0 && (
                   <Pagination
                     currentPage={datasetsPage}
                     totalCount={datasetsTotalCount}
@@ -1475,9 +1413,28 @@ export const WorkspaceDetailPage: React.FC = () => {
                       setDatasetsPage(1);
                     }}
                     gridConfig={{ cols: { sm: 1, md: 2, lg: 4, xl: 4 } }}
+                    sortControl={{
+                      label: 'Order by',
+                      options: [
+                        { value: 'created_at', label: 'Created Time' },
+                        { value: 'updated_at', label: 'Updated Time' },
+                        { value: 'name', label: 'Name' },
+                        { value: 'id', label: 'ID' },
+                      ],
+                      value: datasetsSortField,
+                      onChange: (value) => {
+                        setDatasetsSortField(value as BaseSortField);
+                        setDatasetsPage(1);
+                      },
+                      desc: datasetsSortDesc,
+                      onToggleDirection: () => {
+                        setDatasetsSortDesc((prev) => !prev);
+                        setDatasetsPage(1);
+                      },
+                    }}
                   />
                 )}
-                {activeTab === 'training-jobs' && trainingJobsTotalCount > trainingJobsPageSize && (
+                {activeTab === 'training-jobs' && trainingJobsTotalCount > 0 && (
                   <Pagination
                     currentPage={trainingJobsPage}
                     totalCount={trainingJobsTotalCount}
@@ -1485,6 +1442,26 @@ export const WorkspaceDetailPage: React.FC = () => {
                     onPageChange={setTrainingJobsPage}
                     onPageSizeChange={handleTrainingJobsPageSizeChange}
                     gridConfig={{ cols: { sm: 1, md: 2, lg: 4, xl: 4 } }}
+                    sortControl={{
+                      label: 'Order by',
+                      options: [
+                        { value: 'created_at', label: 'Created Time' },
+                        { value: 'updated_at', label: 'Updated Time' },
+                        { value: 'name', label: 'Name' },
+                        { value: 'time_spent', label: 'Time Spent' },
+                        { value: 'id', label: 'ID' },
+                      ],
+                      value: trainingJobsSortField,
+                      onChange: (value) => {
+                        setTrainingJobsSortField(value as JobSortField);
+                        setTrainingJobsPage(1);
+                      },
+                      desc: trainingJobsSortDesc,
+                      onToggleDirection: () => {
+                        setTrainingJobsSortDesc((prev) => !prev);
+                        setTrainingJobsPage(1);
+                      },
+                    }}
                   />
                 )}
               </div>

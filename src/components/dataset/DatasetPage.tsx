@@ -15,6 +15,8 @@ import { useForm } from '../../hooks/useForm';
 import { imageAPI } from '../../api';
 import type { CreateDatasetRequest } from '../../types';
 
+const DATASET_COUNT_CONCURRENCY = 4;
+
 export const DatasetPage: React.FC = () => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
@@ -22,6 +24,10 @@ export const DatasetPage: React.FC = () => {
   const { datasets, totalCount, isLoading, createDataset } = useDatasets(workspaceId);
   const [createMode, setCreateMode] = useState(false);
   const [imageCount, setImageCount] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    setImageCount({});
+  }, [workspaceId]);
 
   const workspace = workspaceId ? workspaces.find(w => w.id === parseInt(workspaceId)) : null;
 
@@ -45,27 +51,41 @@ export const DatasetPage: React.FC = () => {
 
   // Load image count for each dataset
   useEffect(() => {
+    let cancelled = false;
+
     const loadImageCounts = async () => {
       if (!workspaceId || datasets.length === 0) return;
-      
+
+      const missingDatasets = datasets.filter((dataset) => imageCount[dataset.id] === undefined);
+      if (missingDatasets.length === 0) return;
+
       const counts: Record<number, number> = {};
-      await Promise.all(
-        datasets.map(async (dataset) => {
-          try {
-            const result = await imageAPI.getAll(parseInt(workspaceId), dataset.id, { limit: 1 });
-            counts[dataset.id] = result.total_count;
-          } catch (error) {
-            console.error(`Failed to load image count for dataset ${dataset.id}:`, error);
-            counts[dataset.id] = 0;
-          }
-        })
-      );
-      setImageCount(counts);
+      for (let i = 0; i < missingDatasets.length; i += DATASET_COUNT_CONCURRENCY) {
+        const chunk = missingDatasets.slice(i, i + DATASET_COUNT_CONCURRENCY);
+        await Promise.all(
+          chunk.map(async (dataset) => {
+            try {
+              const result = await imageAPI.getAll(parseInt(workspaceId), dataset.id, { limit: 1 });
+              counts[dataset.id] = result.total_count;
+            } catch (error) {
+              console.error(`Failed to load image count for dataset ${dataset.id}:`, error);
+              counts[dataset.id] = 0;
+            }
+          })
+        );
+      }
+
+      if (!cancelled) {
+        setImageCount((prev) => ({ ...prev, ...counts }));
+      }
     };
 
-    loadImageCounts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId, datasets.length, datasets.map(d => d.id).join(',')]);
+    void loadImageCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, datasets, imageCount]);
 
   if (isLoading) {
     return (
