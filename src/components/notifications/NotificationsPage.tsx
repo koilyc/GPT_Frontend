@@ -147,30 +147,6 @@ export const NotificationsPage: React.FC = () => {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <select
-                value={sortField}
-                onChange={(e) => {
-                  setSortField(e.target.value as NotificationSortField);
-                  setCurrentPage(1);
-                }}
-                className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100"
-              >
-                <option value="created_at">Sort by Created Time</option>
-                <option value="updated_at">Sort by Updated Time</option>
-                <option value="name">Sort by Name</option>
-                <option value="id">Sort by ID</option>
-              </select>
-              <select
-                value={sortDesc ? 'desc' : 'asc'}
-                onChange={(e) => {
-                  setSortDesc(e.target.value === 'desc');
-                  setCurrentPage(1);
-                }}
-                className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100"
-              >
-                <option value="desc">Descending</option>
-                <option value="asc">Ascending</option>
-              </select>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Showing {notifications.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} - {Math.min(currentPage * pageSize, totalCount)} of {totalCount} notifications
               </div>
@@ -285,7 +261,7 @@ export const NotificationsPage: React.FC = () => {
           </div>
           
           {/* Fixed Pagination */}
-          {totalCount > pageSize && (
+          {totalCount > 0 && (
             <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 <Pagination
@@ -296,6 +272,25 @@ export const NotificationsPage: React.FC = () => {
                   onPageSizeChange={(newSize) => {
                     setPageSize(newSize);
                     setCurrentPage(1);
+                  }}
+                  sortControl={{
+                    label: 'Order by',
+                    options: [
+                      { value: 'created_at', label: 'Created Time' },
+                      { value: 'updated_at', label: 'Updated Time' },
+                      { value: 'name', label: 'Name' },
+                      { value: 'id', label: 'ID' },
+                    ],
+                    value: sortField,
+                    onChange: (value) => {
+                      setSortField(value as NotificationSortField);
+                      setCurrentPage(1);
+                    },
+                    desc: sortDesc,
+                    onToggleDirection: () => {
+                      setSortDesc((prev) => !prev);
+                      setCurrentPage(1);
+                    },
                   }}
                 />
               </div>

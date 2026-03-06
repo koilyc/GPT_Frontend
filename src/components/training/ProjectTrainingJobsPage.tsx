@@ -238,33 +238,6 @@ export const ProjectTrainingJobsPage: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <select
-                    value={sortField}
-                    onChange={(e) => {
-                      setSortField(e.target.value as JobSortField);
-                      setPage(1);
-                    }}
-                    className="w-full px-3 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-500"
-                  >
-                    <option value="created_at">Sort by Created Time</option>
-                    <option value="updated_at">Sort by Updated Time</option>
-                    <option value="name">Sort by Name</option>
-                    <option value="time_spent">Sort by Time Spent</option>
-                    <option value="id">Sort by ID</option>
-                  </select>
-                  <select
-                    value={sortDesc ? 'desc' : 'asc'}
-                    onChange={(e) => {
-                      setSortDesc(e.target.value === 'desc');
-                      setPage(1);
-                    }}
-                    className="w-full px-3 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-500"
-                  >
-                    <option value="desc">Descending</option>
-                    <option value="asc">Ascending</option>
-                  </select>
-                </div>
               </CardContent>
             </Card>
 
@@ -298,7 +271,7 @@ export const ProjectTrainingJobsPage: React.FC = () => {
                   ))}
                 </div>
 
-                {totalCount > pageSize && (
+                {totalCount > 0 && (
                   <Pagination
                     currentPage={page}
                     totalCount={totalCount}
@@ -306,6 +279,26 @@ export const ProjectTrainingJobsPage: React.FC = () => {
                     onPageChange={setPage}
                     onPageSizeChange={handlePageSizeChange}
                     gridConfig={{ cols: { sm: 1, md: 2, lg: 4, xl: 4 } }}
+                    sortControl={{
+                      label: 'Order by',
+                      options: [
+                        { value: 'created_at', label: 'Created Time' },
+                        { value: 'updated_at', label: 'Updated Time' },
+                        { value: 'name', label: 'Name' },
+                        { value: 'time_spent', label: 'Time Spent' },
+                        { value: 'id', label: 'ID' },
+                      ],
+                      value: sortField,
+                      onChange: (value) => {
+                        setSortField(value as JobSortField);
+                        setPage(1);
+                      },
+                      desc: sortDesc,
+                      onToggleDirection: () => {
+                        setSortDesc((prev) => !prev);
+                        setPage(1);
+                      },
+                    }}
                   />
                 )}
               </>

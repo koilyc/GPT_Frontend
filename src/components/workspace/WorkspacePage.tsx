@@ -9,7 +9,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { WorkspaceCard } from '../ui/WorkspaceCard';
 import { Pagination } from '../ui/Pagination';
 import { SearchBar } from '../ui/SearchBar';
-import { PlusIcon, FolderIcon, XIcon, SortAscIcon, SortDescIcon } from 'lucide-react';
+import { PlusIcon, FolderIcon, XIcon } from 'lucide-react';
 import type { CreateWorkspaceRequest } from '../../types';
 
 export const WorkspacePage: React.FC = () => {
@@ -49,11 +49,15 @@ export const WorkspacePage: React.FC = () => {
     },
   });
 
-  const handleSort = (field: 'id' | 'name' | 'created_at' | 'updated_at') => {
-    const newDesc = sortField === field ? !sortDesc : false;
+  const handleSortFieldChange = (field: 'id' | 'name' | 'created_at' | 'updated_at') => {
     setSortField(field);
+    sortWorkspaces(field, sortDesc);
+  };
+
+  const handleToggleSortDirection = () => {
+    const newDesc = !sortDesc;
     setSortDesc(newDesc);
-    sortWorkspaces(field, newDesc);
+    sortWorkspaces(sortField, newDesc);
   };
 
   if (isLoading) {
@@ -96,23 +100,6 @@ export const WorkspacePage: React.FC = () => {
                   onSearch={searchWorkspaces}
                   defaultValue={params.search || ''}
                 />
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">排序：</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSort('name')}
-                  className="flex items-center space-x-1"
-                >
-                  <span>名稱</span>
-                  {sortField === 'name' && (
-                    sortDesc ? 
-                      <SortDescIcon className="w-4 h-4" /> : 
-                      <SortAscIcon className="w-4 h-4" />
-                  )}
-                </Button>
               </div>
             </div>
           </div>
@@ -240,7 +227,7 @@ export const WorkspacePage: React.FC = () => {
           </div>
           
           {/* Fixed Pagination */}
-          {totalCount > params.limit! && (
+          {totalCount > 0 && (
             <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <Pagination
@@ -249,6 +236,19 @@ export const WorkspacePage: React.FC = () => {
                   pageSize={params.limit || 12}
                   onPageChange={goToPage}
                   onPageSizeChange={changePageSize}
+                  sortControl={{
+                    label: 'Order by',
+                    options: [
+                      { value: 'name', label: 'Name' },
+                      { value: 'id', label: 'ID' },
+                      { value: 'created_at', label: 'Created Time' },
+                      { value: 'updated_at', label: 'Updated Time' },
+                    ],
+                    value: sortField,
+                    onChange: (value) => handleSortFieldChange(value as 'id' | 'name' | 'created_at' | 'updated_at'),
+                    desc: sortDesc,
+                    onToggleDirection: handleToggleSortDirection,
+                  }}
                 />
               </div>
             </div>

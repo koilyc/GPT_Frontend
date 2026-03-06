@@ -362,33 +362,6 @@ export const ProjectDetailPage: React.FC = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <select
-                        value={imagesSortField}
-                        onChange={(e) => {
-                          setImagesSortField(e.target.value as ImageSortField);
-                          setImagesPage(1);
-                        }}
-                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                      >
-                        <option value="created_at">Sort by Created Time</option>
-                        <option value="updated_at">Sort by Updated Time</option>
-                        <option value="name">Sort by Name</option>
-                        <option value="id">Sort by ID</option>
-                      </select>
-                      <select
-                        value={imagesSortDesc ? 'desc' : 'asc'}
-                        onChange={(e) => {
-                          setImagesSortDesc(e.target.value === 'desc');
-                          setImagesPage(1);
-                        }}
-                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                      >
-                        <option value="desc">Descending</option>
-                        <option value="asc">Ascending</option>
-                      </select>
-                    </div>
-
                     {imagesLoading ? (
                       <LoadingState message="Loading project images..." />
                     ) : projectImages.length === 0 ? (
@@ -428,7 +401,7 @@ export const ProjectDetailPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                {imagesTotalCount > imagesPageSize && (
+                {imagesTotalCount > 0 && (
                   <Pagination
                     currentPage={imagesPage}
                     totalCount={imagesTotalCount}
@@ -439,6 +412,25 @@ export const ProjectDetailPage: React.FC = () => {
                       setImagesPage(1);
                     }}
                     gridConfig={{ cols: { sm: 1, md: 2, lg: 4, xl: 4 } }}
+                    sortControl={{
+                      label: 'Order by',
+                      options: [
+                        { value: 'created_at', label: 'Created Time' },
+                        { value: 'updated_at', label: 'Updated Time' },
+                        { value: 'name', label: 'Name' },
+                        { value: 'id', label: 'ID' },
+                      ],
+                      value: imagesSortField,
+                      onChange: (value) => {
+                        setImagesSortField(value as ImageSortField);
+                        setImagesPage(1);
+                      },
+                      desc: imagesSortDesc,
+                      onToggleDirection: () => {
+                        setImagesSortDesc((prev) => !prev);
+                        setImagesPage(1);
+                      },
+                    }}
                   />
                 )}
               </div>

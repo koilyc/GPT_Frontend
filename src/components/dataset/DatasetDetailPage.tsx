@@ -44,8 +44,8 @@ export const DatasetDetailPage: React.FC = () => {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [allImages, setAllImages] = useState<DatasetImage[]>([]); // Store all images
-  const [images, setImages] = useState<DatasetImage[]>([]); // Current page images
+  const [images, setImages] = useState<DatasetImage[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedImage, setSelectedImage] = useState<DatasetImage | null>(null);
@@ -64,7 +64,7 @@ export const DatasetDetailPage: React.FC = () => {
     cols: { sm: 2, md: 3, lg: 4, xl: 6 }
   };
 
-  // Load dataset data and images
+  // Load dataset metadata.
   useEffect(() => {
     const loadDataset = async () => {
       if (!datasetId || !workspaceId) return;
@@ -79,82 +79,10 @@ export const DatasetDetailPage: React.FC = () => {
         ]);
         setWorkspace(workspaceData);
         setDataset(datasetData);
-        
-        // Load all images by fetching multiple pages if needed
-        let allImages: any[] = [];
-        let offset = 0;
-        const limit = 100; // Max allowed by API
-        let hasMore = true;
-        
-        while (hasMore) {
-          const imagesData = await imageAPI.getAll(workspaceId, parseInt(datasetId), {
-            limit,
-            offset,
-            order_by: sortField,
-            desc: sortDesc,
-          });
-          
-          console.log('API Response:', imagesData);
-          
-          if (offset === 0) {
-            setTotalImages(imagesData.total_count || 0);
-          }
-          
-          // Handle different response formats (API returns "Images" with capital I)
-          const imagesList = Array.isArray(imagesData.Images) 
-            ? imagesData.Images 
-            : Array.isArray(imagesData.images) 
-              ? imagesData.images 
-              : Array.isArray(imagesData) 
-                ? imagesData 
-                : [];
-          
-          allImages = [...allImages, ...imagesList];
-          
-          // Check if we have more images to fetch
-          hasMore = imagesList.length === limit && allImages.length < (imagesData.total_count || 0);
-          offset += limit;
-        }
-        
-        // Get presigned URLs for each image (using thumbnail for better performance)
-        const imageUrlPromises = allImages.map(async (img) => {
-          try {
-            const urlData = await imageAPI.getThumbnailUrl(workspaceId, parseInt(datasetId), img.id);
-            return {
-              id: img.id,
-              filename: img.name,
-              url: urlData.presigned_url,
-              size: img.image_metadata?.file_size_kb ? img.image_metadata.file_size_kb * 1024 : 0,
-              dimensions: { 
-                width: img.image_metadata?.width || 0, 
-                height: img.image_metadata?.height || 0 
-              },
-              uploadDate: img.created_at
-            };
-          } catch (error) {
-            console.error(`Failed to get URL for image ${img.id}:`, error);
-            // Fallback to basic info without URL
-            return {
-              id: img.id,
-              filename: img.name,
-              url: '', // Empty URL for failed cases
-              size: img.image_metadata?.file_size_kb ? img.image_metadata.file_size_kb * 1024 : 0,
-              dimensions: { 
-                width: img.image_metadata?.width || 0, 
-                height: img.image_metadata?.height || 0 
-              },
-              uploadDate: img.created_at
-            };
-          }
-        });
-        
-        const formattedImages = await Promise.all(imageUrlPromises);
-        setAllImages(formattedImages);
-        
       } catch (error) {
         console.error('Error loading dataset:', error);
         setDataset(null);
-        setAllImages([]);
+        setImages([]);
         setTotalImages(0);
       } finally {
         setIsLoading(false);
@@ -162,32 +90,75 @@ export const DatasetDetailPage: React.FC = () => {
     };
 
     loadDataset();
-  }, [datasetId, workspaceId, sortField, sortDesc]);
+  }, [datasetId, workspaceId]);
 
-  // Client-side filtering and pagination
+  // Server-side filtering/sorting/pagination for images.
   useEffect(() => {
-    if (!allImages.length) {
-      setImages([]);
-      setTotalCount(0);
-      return;
-    }
+    const loadImages = async () => {
+      if (!workspaceId || !datasetId) return;
 
-    // Apply search filter
-    const filteredImages = filter 
-      ? allImages.filter(img => 
-          img.filename.toLowerCase().includes(filter.toLowerCase())
-        )
-      : allImages;
+      try {
+        setImagesLoading(true);
+        const response = await imageAPI.getAll(workspaceId, parseInt(datasetId), {
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
+          order_by: sortField,
+          desc: sortDesc,
+          keyword: filter.trim() || undefined,
+        });
 
-    setTotalCount(filteredImages.length);
+        const imagesList = Array.isArray(response.Images)
+          ? response.Images
+          : Array.isArray(response.images)
+            ? response.images
+            : [];
 
-    // Apply pagination
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const paginatedImages = filteredImages.slice(startIndex, endIndex);
+        const formattedImages = await Promise.all(
+          imagesList.map(async (img: any) => {
+            try {
+              const urlData = await imageAPI.getThumbnailUrl(workspaceId, parseInt(datasetId), img.id);
+              return {
+                id: img.id,
+                filename: img.name,
+                url: urlData.presigned_url,
+                size: img.image_metadata?.file_size_kb ? img.image_metadata.file_size_kb * 1024 : 0,
+                dimensions: {
+                  width: img.image_metadata?.width || 0,
+                  height: img.image_metadata?.height || 0,
+                },
+                uploadDate: img.created_at,
+              } as DatasetImage;
+            } catch (error) {
+              console.error(`Failed to get URL for image ${img.id}:`, error);
+              return {
+                id: img.id,
+                filename: img.name,
+                url: '',
+                size: img.image_metadata?.file_size_kb ? img.image_metadata.file_size_kb * 1024 : 0,
+                dimensions: {
+                  width: img.image_metadata?.width || 0,
+                  height: img.image_metadata?.height || 0,
+                },
+                uploadDate: img.created_at,
+              } as DatasetImage;
+            }
+          })
+        );
 
-    setImages(paginatedImages);
-  }, [allImages, currentPage, pageSize, filter]);
+        setImages(formattedImages);
+        setTotalCount(response.total_count || 0);
+        setTotalImages(response.total_count || 0);
+      } catch (error) {
+        console.error('Failed to load paged images:', error);
+        setImages([]);
+        setTotalCount(0);
+      } finally {
+        setImagesLoading(false);
+      }
+    };
+
+    loadImages();
+  }, [workspaceId, datasetId, currentPage, pageSize, sortField, sortDesc, filter]);
 
   if (isLoading) {
     return (
@@ -236,50 +207,7 @@ export const DatasetDetailPage: React.FC = () => {
       });
       
       await Promise.all(uploadPromises);
-      
-      // Reload all images to see new uploads
-      const imagesData = await imageAPI.getAll(workspaceId, parseInt(datasetId), {
-        limit: 100,
-        order_by: sortField,
-        desc: sortDesc,
-      });
-      setTotalImages(imagesData.total_count);
-      
-      // Get presigned URLs for each image (API returns "Images" with capital I, using thumbnail for better performance)
-      const imagesList = imagesData.Images || imagesData.images || [];
-      const imageUrlPromises = imagesList.map(async (img) => {
-        try {
-          const urlData = await imageAPI.getThumbnailUrl(workspaceId, parseInt(datasetId), img.id);
-          return {
-            id: img.id,
-            filename: img.name,
-            url: urlData.presigned_url,
-            size: img.image_metadata?.file_size_kb ? img.image_metadata.file_size_kb * 1024 : 0,
-            dimensions: { 
-              width: img.image_metadata?.width || 0, 
-              height: img.image_metadata?.height || 0 
-            },
-            uploadDate: img.created_at
-          };
-        } catch (error) {
-          console.error(`Failed to get URL for uploaded image ${img.id}:`, error);
-          // Fallback without URL
-          return {
-            id: img.id,
-            filename: img.name,
-            url: '',
-            size: img.image_metadata?.file_size_kb ? img.image_metadata.file_size_kb * 1024 : 0,
-            dimensions: { 
-              width: img.image_metadata?.width || 0, 
-              height: img.image_metadata?.height || 0 
-            },
-            uploadDate: img.created_at
-          };
-        }
-      });
-      
-      const formattedImages = await Promise.all(imageUrlPromises);
-      setAllImages(formattedImages);
+      // Jump to first page after upload so new items are visible with current sorting.
       setCurrentPage(1);
     } catch (error) {
       console.error('Upload failed:', error);
@@ -298,9 +226,10 @@ export const DatasetDetailPage: React.FC = () => {
     if (confirm('確定要刪除這張圖片嗎？')) {
       try {
         await imageAPI.delete(workspaceId, parseInt(datasetId), imageId);
-        // Remove from all images and let the effect update the current page
-        setAllImages(prev => prev.filter(img => img.id !== imageId));
-        setTotalImages(prev => prev - 1);
+        // Optimistically update current page and counters.
+        setImages(prev => prev.filter(img => img.id !== imageId));
+        setTotalImages(prev => Math.max(0, prev - 1));
+        setTotalCount(prev => Math.max(0, prev - 1));
       } catch (error) {
         console.error('Delete failed:', error);
         alert('刪除失敗，請重試');
@@ -349,8 +278,8 @@ export const DatasetDetailPage: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // Calculate stats from all images, not just current page
-  const totalSize = allImages.reduce((sum, img) => sum + img.size, 0);
+  // Stats are calculated from the current page to avoid heavy full-dataset fetches.
+  const totalSize = images.reduce((sum, img) => sum + img.size, 0);
 
   if (!dataset) {
     return (
@@ -441,8 +370,8 @@ export const DatasetDetailPage: React.FC = () => {
             />
             <StatCard
               title="Avg Resolution"
-              value={allImages.length > 0 ? 
-                `${Math.round(allImages.reduce((sum, img) => sum + img.dimensions.width, 0) / allImages.length)}x${Math.round(allImages.reduce((sum, img) => sum + img.dimensions.height, 0) / allImages.length)}` 
+              value={images.length > 0 ? 
+                `${Math.round(images.reduce((sum, img) => sum + img.dimensions.width, 0) / images.length)}x${Math.round(images.reduce((sum, img) => sum + img.dimensions.height, 0) / images.length)}` 
                 : 'N/A'
               }
               icon={ZoomInIcon}
@@ -451,7 +380,7 @@ export const DatasetDetailPage: React.FC = () => {
             />
             <StatCard
               title="Last Upload"
-              value={allImages.length > 0 ? 'Today' : 'Never'}
+              value={totalImages > 0 ? 'Available' : 'Never'}
               icon={UploadIcon}
               iconColor="text-white"
               iconBgColor="bg-orange-500"
@@ -470,24 +399,6 @@ export const DatasetDetailPage: React.FC = () => {
                     className="w-full"
                   />
                 </div>
-                <select
-                  value={sortField}
-                  onChange={(e) => handleSortFieldChange(e.target.value as ImageSortField)}
-                  className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="created_at">Sort by Created Time</option>
-                  <option value="updated_at">Sort by Updated Time</option>
-                  <option value="name">Sort by Name</option>
-                  <option value="id">Sort by ID</option>
-                </select>
-                <select
-                  value={sortDesc ? 'desc' : 'asc'}
-                  onChange={(e) => handleSortDirectionChange(e.target.value === 'desc')}
-                  className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="desc">Descending</option>
-                  <option value="asc">Ascending</option>
-                </select>
                 <Button variant="outline" className="px-4 py-2">
                   <FilterIcon className="h-4 w-4 mr-2" />
                   Filter
@@ -638,7 +549,7 @@ export const DatasetDetailPage: React.FC = () => {
             </CardContent>
             
             {/* Pagination */}
-            {allImages.length > 0 && (
+            {totalCount > 0 && (
               <Pagination
                 currentPage={currentPage}
                 totalCount={totalCount}
@@ -646,6 +557,19 @@ export const DatasetDetailPage: React.FC = () => {
                 onPageChange={handlePageChange}
                 onPageSizeChange={handlePageSizeChange}
                 gridConfig={gridConfig}
+                sortControl={{
+                  label: 'Order by',
+                  options: [
+                    { value: 'created_at', label: 'Created Time' },
+                    { value: 'updated_at', label: 'Updated Time' },
+                    { value: 'name', label: 'Name' },
+                    { value: 'id', label: 'ID' },
+                  ],
+                  value: sortField,
+                  onChange: (value) => handleSortFieldChange(value as ImageSortField),
+                  desc: sortDesc,
+                  onToggleDirection: () => handleSortDirectionChange(!sortDesc),
+                }}
               />
             )}
           </Card>
