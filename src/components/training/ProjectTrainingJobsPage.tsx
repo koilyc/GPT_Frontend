@@ -16,6 +16,7 @@ import { projectAPI, trainingJobAPI, workspaceAPI } from '../../api';
 import type { JobStatus, Project, TrainingJob, Workspace } from '../../types';
 
 const MAX_TRAINING_PAGE_SIZE = 100;
+type JobSortField = 'id' | 'name' | 'created_at' | 'updated_at' | 'time_spent';
 
 const STATUS_OPTIONS: Array<{ value: 'all' | JobStatus; label: string }> = [
   { value: 'all', label: 'All Status' },
@@ -43,6 +44,8 @@ export const ProjectTrainingJobsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | JobStatus>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
+  const [sortField, setSortField] = useState<JobSortField>('created_at');
+  const [sortDesc, setSortDesc] = useState(true);
 
   useEffect(() => {
     const loadMeta = async () => {
@@ -86,10 +89,10 @@ export const ProjectTrainingJobsPage: React.FC = () => {
       offset,
       keyword: keyword.length > 0 ? keyword : undefined,
       job_status: statusFilter === 'all' ? undefined : [statusFilter],
-      order_by: 'created_at',
-      desc: true,
+      order_by: sortField,
+      desc: sortDesc,
     });
-  }, [workspaceIdNum, projectIdNum, page, pageSize, searchText, statusFilter, fetchTrainingJobs]);
+  }, [workspaceIdNum, projectIdNum, page, pageSize, searchText, statusFilter, sortField, sortDesc, fetchTrainingJobs]);
 
   const stats = useMemo(() => {
     return {
@@ -108,8 +111,8 @@ export const ProjectTrainingJobsPage: React.FC = () => {
       offset: (page - 1) * Math.min(pageSize, MAX_TRAINING_PAGE_SIZE),
       keyword: searchText.trim() || undefined,
       job_status: statusFilter === 'all' ? undefined : [statusFilter],
-      order_by: 'created_at',
-      desc: true,
+      order_by: sortField,
+      desc: sortDesc,
     });
   };
 
@@ -119,8 +122,8 @@ export const ProjectTrainingJobsPage: React.FC = () => {
       offset: (page - 1) * Math.min(pageSize, MAX_TRAINING_PAGE_SIZE),
       keyword: searchText.trim() || undefined,
       job_status: statusFilter === 'all' ? undefined : [statusFilter],
-      order_by: 'created_at',
-      desc: true,
+      order_by: sortField,
+      desc: sortDesc,
     });
   };
 
@@ -232,6 +235,34 @@ export const ProjectTrainingJobsPage: React.FC = () => {
                         {status.label}
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <select
+                    value={sortField}
+                    onChange={(e) => {
+                      setSortField(e.target.value as JobSortField);
+                      setPage(1);
+                    }}
+                    className="w-full px-3 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-500"
+                  >
+                    <option value="created_at">Sort by Created Time</option>
+                    <option value="updated_at">Sort by Updated Time</option>
+                    <option value="name">Sort by Name</option>
+                    <option value="time_spent">Sort by Time Spent</option>
+                    <option value="id">Sort by ID</option>
+                  </select>
+                  <select
+                    value={sortDesc ? 'desc' : 'asc'}
+                    onChange={(e) => {
+                      setSortDesc(e.target.value === 'desc');
+                      setPage(1);
+                    }}
+                    className="w-full px-3 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-500"
+                  >
+                    <option value="desc">Descending</option>
+                    <option value="asc">Ascending</option>
                   </select>
                 </div>
               </CardContent>

@@ -33,6 +33,8 @@ interface DatasetImage {
   uploadDate: string;
 }
 
+type ImageSortField = 'id' | 'name' | 'created_at' | 'updated_at';
+
 export const DatasetDetailPage: React.FC = () => {
   const { workspaceId, datasetId } = useParams<{ workspaceId: string; datasetId: string }>();
   const navigate = useNavigate();
@@ -52,6 +54,8 @@ export const DatasetDetailPage: React.FC = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12); // 基於 lg: 4 cols * 3 rows
+  const [sortField, setSortField] = useState<ImageSortField>('created_at');
+  const [sortDesc, setSortDesc] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [totalImages, setTotalImages] = useState(0); // For stats display
 
@@ -85,7 +89,9 @@ export const DatasetDetailPage: React.FC = () => {
         while (hasMore) {
           const imagesData = await imageAPI.getAll(workspaceId, parseInt(datasetId), {
             limit,
-            offset
+            offset,
+            order_by: sortField,
+            desc: sortDesc,
           });
           
           console.log('API Response:', imagesData);
@@ -156,7 +162,7 @@ export const DatasetDetailPage: React.FC = () => {
     };
 
     loadDataset();
-  }, [datasetId, workspaceId]); // Remove pagination dependencies since we're doing client-side pagination
+  }, [datasetId, workspaceId, sortField, sortDesc]);
 
   // Client-side filtering and pagination
   useEffect(() => {
@@ -233,7 +239,9 @@ export const DatasetDetailPage: React.FC = () => {
       
       // Reload all images to see new uploads
       const imagesData = await imageAPI.getAll(workspaceId, parseInt(datasetId), {
-        limit: 100 // Use max allowed limit
+        limit: 100,
+        order_by: sortField,
+        desc: sortDesc,
       });
       setTotalImages(imagesData.total_count);
       
@@ -272,6 +280,7 @@ export const DatasetDetailPage: React.FC = () => {
       
       const formattedImages = await Promise.all(imageUrlPromises);
       setAllImages(formattedImages);
+      setCurrentPage(1);
     } catch (error) {
       console.error('Upload failed:', error);
       alert('上傳失敗，請重試');
@@ -320,6 +329,16 @@ export const DatasetDetailPage: React.FC = () => {
   const handleSearchChange = (searchTerm: string) => {
     setFilter(searchTerm);
     setCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleSortFieldChange = (nextField: ImageSortField) => {
+    setSortField(nextField);
+    setCurrentPage(1);
+  };
+
+  const handleSortDirectionChange = (nextDesc: boolean) => {
+    setSortDesc(nextDesc);
+    setCurrentPage(1);
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -451,6 +470,24 @@ export const DatasetDetailPage: React.FC = () => {
                     className="w-full"
                   />
                 </div>
+                <select
+                  value={sortField}
+                  onChange={(e) => handleSortFieldChange(e.target.value as ImageSortField)}
+                  className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="created_at">Sort by Created Time</option>
+                  <option value="updated_at">Sort by Updated Time</option>
+                  <option value="name">Sort by Name</option>
+                  <option value="id">Sort by ID</option>
+                </select>
+                <select
+                  value={sortDesc ? 'desc' : 'asc'}
+                  onChange={(e) => handleSortDirectionChange(e.target.value === 'desc')}
+                  className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="desc">Descending</option>
+                  <option value="asc">Ascending</option>
+                </select>
                 <Button variant="outline" className="px-4 py-2">
                   <FilterIcon className="h-4 w-4 mr-2" />
                   Filter

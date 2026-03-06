@@ -23,6 +23,8 @@ import { Pagination } from '../ui/Pagination';
 import { projectAPI, categoryAPI, workspaceAPI, imageAPI } from '../../api';
 import type { Project, Category, Workspace, ProjectImage } from '../../types';
 
+type ImageSortField = 'id' | 'name' | 'created_at' | 'updated_at';
+
 export const ProjectDetailPage: React.FC = () => {
   const { workspaceId, projectId } = useParams<{ workspaceId: string; projectId: string }>();
   const navigate = useNavigate();
@@ -41,6 +43,8 @@ export const ProjectDetailPage: React.FC = () => {
   const [imagesLoading, setImagesLoading] = useState(false);
   const [imagesPage, setImagesPage] = useState(1);
   const [imagesPageSize, setImagesPageSize] = useState(20);
+  const [imagesSortField, setImagesSortField] = useState<ImageSortField>('created_at');
+  const [imagesSortDesc, setImagesSortDesc] = useState(true);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<number, string>>({});
 
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -55,7 +59,12 @@ export const ProjectDetailPage: React.FC = () => {
         workspaceAPI.getById(workspaceIdNum),
         projectAPI.getById(workspaceIdNum, projectIdNum),
         categoryAPI.getAll(workspaceIdNum, projectIdNum),
-        projectAPI.getImages(workspaceIdNum, projectIdNum, { limit: 1, offset: 0 }),
+        projectAPI.getImages(workspaceIdNum, projectIdNum, {
+          limit: 1,
+          offset: 0,
+          order_by: imagesSortField,
+          desc: imagesSortDesc,
+        }),
       ]);
 
       setWorkspace(workspaceData);
@@ -78,6 +87,8 @@ export const ProjectDetailPage: React.FC = () => {
       const response = await projectAPI.getImages(workspaceIdNum, projectIdNum, {
         limit: imagesPageSize,
         offset,
+        order_by: imagesSortField,
+        desc: imagesSortDesc,
       });
 
       const images = response.Images || [];
@@ -113,7 +124,7 @@ export const ProjectDetailPage: React.FC = () => {
     } finally {
       setImagesLoading(false);
     }
-  }, [workspaceIdNum, projectIdNum, imagesPage, imagesPageSize]);
+  }, [workspaceIdNum, projectIdNum, imagesPage, imagesPageSize, imagesSortField, imagesSortDesc]);
 
   useEffect(() => {
     loadProjectMeta();
@@ -351,6 +362,33 @@ export const ProjectDetailPage: React.FC = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <select
+                        value={imagesSortField}
+                        onChange={(e) => {
+                          setImagesSortField(e.target.value as ImageSortField);
+                          setImagesPage(1);
+                        }}
+                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      >
+                        <option value="created_at">Sort by Created Time</option>
+                        <option value="updated_at">Sort by Updated Time</option>
+                        <option value="name">Sort by Name</option>
+                        <option value="id">Sort by ID</option>
+                      </select>
+                      <select
+                        value={imagesSortDesc ? 'desc' : 'asc'}
+                        onChange={(e) => {
+                          setImagesSortDesc(e.target.value === 'desc');
+                          setImagesPage(1);
+                        }}
+                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      >
+                        <option value="desc">Descending</option>
+                        <option value="asc">Ascending</option>
+                      </select>
+                    </div>
+
                     {imagesLoading ? (
                       <LoadingState message="Loading project images..." />
                     ) : projectImages.length === 0 ? (

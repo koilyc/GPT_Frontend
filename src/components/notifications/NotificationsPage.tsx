@@ -8,6 +8,8 @@ import { Pagination } from '../ui/Pagination';
 import { notificationAPI } from '../../api';
 import type { Notification } from '../../types';
 
+type NotificationSortField = 'id' | 'name' | 'created_at' | 'updated_at';
+
 export const NotificationsPage: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,6 +19,8 @@ export const NotificationsPage: React.FC = () => {
   const [unreadTotalCount, setUnreadTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+  const [sortField, setSortField] = useState<NotificationSortField>('created_at');
+  const [sortDesc, setSortDesc] = useState(true);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -25,8 +29,8 @@ export const NotificationsPage: React.FC = () => {
       let params: any = { 
         limit: pageSize, 
         offset: offset,
-        order_by: 'created_at',
-        desc: true
+        order_by: sortField,
+        desc: sortDesc,
       };
       
       if (filter === 'unread') {
@@ -46,7 +50,7 @@ export const NotificationsPage: React.FC = () => {
       setLoading(false);
       setIsInitialLoadDone(true);
     }
-  }, [currentPage, pageSize, filter]);
+  }, [currentPage, pageSize, filter, sortField, sortDesc]);
 
   useEffect(() => {
     loadNotifications();
@@ -142,8 +146,34 @@ export const NotificationsPage: React.FC = () => {
                 </button>
               ))}
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Showing {notifications.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} - {Math.min(currentPage * pageSize, totalCount)} of {totalCount} notifications
+            <div className="flex items-center gap-2">
+              <select
+                value={sortField}
+                onChange={(e) => {
+                  setSortField(e.target.value as NotificationSortField);
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100"
+              >
+                <option value="created_at">Sort by Created Time</option>
+                <option value="updated_at">Sort by Updated Time</option>
+                <option value="name">Sort by Name</option>
+                <option value="id">Sort by ID</option>
+              </select>
+              <select
+                value={sortDesc ? 'desc' : 'asc'}
+                onChange={(e) => {
+                  setSortDesc(e.target.value === 'desc');
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100"
+              >
+                <option value="desc">Descending</option>
+                <option value="asc">Ascending</option>
+              </select>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {notifications.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} - {Math.min(currentPage * pageSize, totalCount)} of {totalCount} notifications
+              </div>
             </div>
           </div>
 

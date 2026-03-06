@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { workspaceAPI, projectAPI, datasetAPI } from '../api';
-import type { Workspace, Project, Dataset } from '../types';
+import type { Workspace, Project, Dataset, PaginationParams } from '../types';
 
 interface UseWorkspaceDetailReturn {
   workspace: Workspace | null;
@@ -14,6 +14,8 @@ interface UseWorkspaceDetailReturn {
   totalTasks: number;
   recentProjects: Project[];
   loadWorkspaceData: () => Promise<void>;
+  loadProjects: (params?: PaginationParams) => Promise<void>;
+  loadDatasets: (params?: PaginationParams) => Promise<void>;
   createProject: (projectData: any) => Promise<void>;
   createDataset: (datasetData: any) => Promise<void>;
 }
@@ -27,36 +29,49 @@ export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailRetur
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadWorkspaceData = useCallback(async (params?: { limit?: number; offset?: number }) => {
+  const loadProjects = useCallback(async (params?: PaginationParams) => {
+    const response = await projectAPI.getAll(workspaceId, {
+      limit: params?.limit ?? 100,
+      offset: params?.offset ?? 0,
+      order_by: params?.order_by ?? 'created_at',
+      desc: params?.desc ?? true,
+    });
+
+    setProjects(response.projects || []);
+    setProjectsTotalCount(response.total_count || 0);
+  }, [workspaceId]);
+
+  const loadDatasets = useCallback(async (params?: PaginationParams) => {
+    const response = await datasetAPI.getAll(workspaceId, {
+      limit: params?.limit ?? 100,
+      offset: params?.offset ?? 0,
+      order_by: params?.order_by ?? 'created_at',
+      desc: params?.desc ?? true,
+    });
+
+    setDatasets(response.datasets || []);
+    setDatasetsTotalCount(response.total_count || 0);
+  }, [workspaceId]);
+
+  const loadWorkspaceData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const [workspaceData, projectsResponse, datasetsResponse] = await Promise.all([
+
+      const [workspaceData] = await Promise.all([
         workspaceAPI.getById(workspaceId),
-        projectAPI.getAll(workspaceId, { 
-          limit: params?.limit ?? 100, 
-          offset: params?.offset ?? 0 
-        }),
-        datasetAPI.getAll(workspaceId, { 
-          limit: params?.limit ?? 100, 
-          offset: params?.offset ?? 0 
-        })
+        loadProjects(),
+        loadDatasets(),
       ]);
 
       setWorkspace(workspaceData);
-      setProjects(projectsResponse.projects || []);
-      setProjectsTotalCount(projectsResponse.total_count || 0);
-      setDatasets(datasetsResponse.datasets || []);
-      setDatasetsTotalCount(datasetsResponse.total_count || 0);
-
     } catch (error) {
       console.error('Failed to load workspace data:', error);
       setError('Failed to load workspace data. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [workspaceId]);
+  }, [workspaceId, loadProjects, loadDatasets]);
 
   const createProject = useCallback(async (projectData: any) => {
     try {
@@ -104,6 +119,8 @@ export const useWorkspaceDetail = (workspaceId: number): UseWorkspaceDetailRetur
     totalTasks,
     recentProjects,
     loadWorkspaceData,
+    loadProjects,
+    loadDatasets,
     createProject,
     createDataset,
   };
