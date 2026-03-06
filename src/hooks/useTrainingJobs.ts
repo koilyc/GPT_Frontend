@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { trainingJobAPI } from '../api';
 import type { TrainingJob, TrainingJobListResponse, JobQueryParams } from '../types';
 
@@ -7,8 +7,9 @@ export const useTrainingJobs = (workspaceId?: number) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [lastQueryParams, setLastQueryParams] = useState<JobQueryParams | undefined>(undefined);
 
-  const fetchTrainingJobs = async (params?: JobQueryParams) => {
+  const fetchTrainingJobs = useCallback(async (params?: JobQueryParams) => {
     if (!workspaceId) {
       setTrainingJobs([]);
       setTotalCount(0);
@@ -17,6 +18,7 @@ export const useTrainingJobs = (workspaceId?: number) => {
 
     setLoading(true);
     setError(null);
+    setLastQueryParams(params);
 
     try {
       const response: TrainingJobListResponse = await trainingJobAPI.getByWorkspace(workspaceId, {
@@ -44,38 +46,23 @@ export const useTrainingJobs = (workspaceId?: number) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [workspaceId]);
 
-  const cancelTrainingJob = async (projectId: number, jobId: number) => {
+  const cancelTrainingJob = useCallback(async (projectId: number, jobId: number) => {
     if (!workspaceId) return;
 
     try {
       await trainingJobAPI.cancel(workspaceId, projectId, jobId);
-      // Refresh the training jobs list
-      fetchTrainingJobs();
+      // Refresh the current paged query after cancellation.
+      fetchTrainingJobs(lastQueryParams);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to cancel training job');
       console.error('Error canceling training job:', err);
     }
-  };
-
-  const deleteTrainingJob = async (projectId: number, jobId: number) => {
-    if (!workspaceId) return;
-
-    try {
-      await trainingJobAPI.delete(workspaceId, projectId, jobId);
-      // Refresh the training jobs list
-      fetchTrainingJobs();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete training job');
-      console.error('Error deleting training job:', err);
-    }
-  };
+  }, [workspaceId, lastQueryParams, fetchTrainingJobs]);
 
   useEffect(() => {
-    if (workspaceId) {
-      fetchTrainingJobs();
-    } else {
+    if (!workspaceId) {
       // Reset state when no workspaceId
       setTrainingJobs([]);
       setTotalCount(0);
@@ -91,8 +78,7 @@ export const useTrainingJobs = (workspaceId?: number) => {
     totalCount,
     fetchTrainingJobs,
     cancelTrainingJob,
-    deleteTrainingJob,
-    refetch: fetchTrainingJobs
+    refetch: () => fetchTrainingJobs(lastQueryParams)
   };
 };
 
@@ -101,12 +87,18 @@ export const useProjectTrainingJobs = (workspaceId?: number, projectId?: number)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [lastQueryParams, setLastQueryParams] = useState<JobQueryParams | undefined>(undefined);
 
-  const fetchTrainingJobs = async (params?: JobQueryParams) => {
-    if (!workspaceId || !projectId) return;
+  const fetchTrainingJobs = useCallback(async (params?: JobQueryParams) => {
+    if (!workspaceId || !projectId) {
+      setTrainingJobs([]);
+      setTotalCount(0);
+      return;
+    }
 
     setLoading(true);
     setError(null);
+    setLastQueryParams(params);
 
     try {
       const response: TrainingJobListResponse = await trainingJobAPI.getByProject(workspaceId, projectId, {
@@ -125,11 +117,14 @@ export const useProjectTrainingJobs = (workspaceId?: number, projectId?: number)
     } finally {
       setLoading(false);
     }
-  };
+  }, [workspaceId, projectId]);
 
   useEffect(() => {
-    if (workspaceId && projectId) {
-      fetchTrainingJobs();
+    if (!workspaceId || !projectId) {
+      setTrainingJobs([]);
+      setTotalCount(0);
+      setError(null);
+      setLoading(false);
     }
   }, [workspaceId, projectId]);
 
@@ -139,6 +134,6 @@ export const useProjectTrainingJobs = (workspaceId?: number, projectId?: number)
     error,
     totalCount,
     fetchTrainingJobs,
-    refetch: fetchTrainingJobs
+    refetch: () => fetchTrainingJobs(lastQueryParams)
   };
 };

@@ -14,6 +14,8 @@ import { ImageManagementPage } from './components/image/ImageManagementPage';
 import { AnnotationPage } from './components/annotation/AnnotationPage';
 import { NotificationsPage } from './components/notifications/NotificationsPage';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { WorkspaceTrainingJobsPage } from './components/training/WorkspaceTrainingJobsPage';
+import { ProjectTrainingJobsPage } from './components/training/ProjectTrainingJobsPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 function App() {
@@ -110,6 +112,26 @@ function App() {
                   </ErrorBoundary>
                 </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/workspaces/:workspaceId/training-jobs"
+              element={
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <WorkspaceTrainingJobsPage />
+                  </ErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workspaces/:workspaceId/projects/:projectId/training-jobs"
+              element={
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <ProjectTrainingJobsPage />
+                  </ErrorBoundary>
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/workspaces/:workspaceId/datasets" 

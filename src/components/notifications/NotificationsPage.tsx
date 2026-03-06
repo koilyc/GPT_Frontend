@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BellIcon, CheckIcon, FilterIcon } from 'lucide-react';
 import { Layout } from '../layout/Layout';
 import { Card, CardContent } from '../ui/Card';
@@ -14,18 +14,11 @@ export const NotificationsPage: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [unreadTotalCount, setUnreadTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
 
-  useEffect(() => {
-    setCurrentPage(1); // Reset to first page when filter changes
-    loadNotifications();
-  }, [filter]);
-
-  useEffect(() => {
-    loadNotifications();
-  }, [currentPage, pageSize]);
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       setLoading(true);
       const offset = (currentPage - 1) * pageSize;
@@ -46,12 +39,18 @@ export const NotificationsPage: React.FC = () => {
       const response = await notificationAPI.getAll(params);
       setNotifications(response.notifications || []);
       setTotalCount(response.total_count || 0);
+      setUnreadTotalCount(response.unread_count || 0);
     } catch (error) {
       console.error('Failed to load notifications:', error);
     } finally {
       setLoading(false);
+      setIsInitialLoadDone(true);
     }
-  };
+  }, [currentPage, pageSize, filter]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
 
   const handleMarkAsRead = async (id: number) => {
     try {
@@ -81,7 +80,7 @@ export const NotificationsPage: React.FC = () => {
     return 'text-blue-600 bg-blue-100';
   };
 
-  if (loading && notifications.length === 0) {
+  if (!isInitialLoadDone && loading) {
     return (
       <Layout>
         <LoadingState message="Loading notifications..." />
@@ -89,7 +88,7 @@ export const NotificationsPage: React.FC = () => {
     );
   }
 
-  const unreadCount = notifications.filter(n => !n.read_at).length;
+  const unreadCount = unreadTotalCount;
 
   return (
     <Layout>
@@ -127,7 +126,10 @@ export const NotificationsPage: React.FC = () => {
               {(['all', 'unread'] as const).map((f) => (
                 <button
                   key={f}
-                  onClick={() => setFilter(f)}
+                  onClick={() => {
+                    setCurrentPage(1);
+                    setFilter(f);
+                  }}
                   className={`
                     px-4 py-2 rounded-lg font-medium text-sm transition-colors
                     ${filter === f

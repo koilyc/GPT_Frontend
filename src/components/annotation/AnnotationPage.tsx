@@ -1,26 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeftIcon, 
-  SaveIcon, 
-  TrashIcon,
-  ZoomInIcon,
-  ZoomOutIcon,
-  SquareIcon,
-  PenToolIcon,
-  MousePointerIcon
-} from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeftIcon, ZoomInIcon, ZoomOutIcon } from 'lucide-react';
 import { Layout } from '../layout/Layout';
 import { Button } from '../ui/Button';
 import { Card, CardContent } from '../ui/Card';
 import { LoadingState } from '../ui/LoadingState';
-import { ToastContainer } from '../ui/ToastContainer';
-import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { useToast } from '../../hooks/useToast';
-import { projectAPI, categoryAPI, annotationAPI } from '../../api';
-import type { Project, Image, Category, GeneralAnnotation } from '../../types';
-
-type ToolType = 'select' | 'bbox' | 'polygon';
+import { projectAPI, categoryAPI, annotationAPI, imageAPI } from '../../api';
+import type { Project, Category, ProjectImage } from '../../types';
 
 interface BBox {
   x: number;
@@ -35,135 +21,271 @@ interface PolygonAnnotation {
   categoryId: number;
 }
 
+interface RotatedBoxAnnotation {
+  xtl: number;
+  ytl: number;
+  xbr: number;
+  ybr: number;
+  rotation: number;
+  categoryId: number;
+}
+
+interface MaskAnnotation {
+  rle: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  categoryId: number;
+}
+
+const hexToRgb = (hex: string): [number, number, number] => {
+  const normalized = hex.replace('#', '');
+  if (normalized.length !== 6) return [255, 0, 0];
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  if ([r, g, b].some((n) => Number.isNaN(n))) return [255, 0, 0];
+  return [r, g, b];
+};
+
+const decodeCompressedRleCounts = (encoded: string): number[] => {
+  const counts: number[] = [];
+  let p = 0;
+  let m = 0;
+
+  while (p < encoded.length) {
+    let x = 0;
+    let k = 0;
+    let more = true;
+
+    while (more) {
+      const c = encoded.charCodeAt(p) - 48;
+      p += 1;
+      x |= (c & 0x1f) << (5 * k);
+      more = (c & 0x20) !== 0;
+      k += 1;
+      if (!more && (c & 0x10) !== 0) {
+        x |= -1 << (5 * k);
+      }
+    }
+
+    if (m > 2) {
+      x += counts[m - 2];
+    }
+    counts.push(x);
+    m += 1;
+  }
+
+  return counts;
+};
+
+const decodeMaskRle = (encoded: string, width: number, height: number): Uint8Array => {
+  const counts = decodeCompressedRleCounts(encoded);
+  const total = width * height;
+  const mask = new Uint8Array(total);
+
+  let idx = 0;
+  let value = 0;
+  for (const count of counts) {
+    if (!Number.isFinite(count) || count <= 0) {
+      value = 1 - value;
+      continue;
+    }
+
+    const end = Math.min(total, idx + count);
+    if (value === 1) {
+      mask.fill(1, idx, end);
+    }
+    idx = end;
+    value = 1 - value;
+    if (idx >= total) break;
+  }
+
+  return mask;
+};
+
 export const AnnotationPage: React.FC = () => {
   const { workspaceId, projectId } = useParams<{ workspaceId: string; projectId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
+
   const [project, setProject] = useState<Project | null>(null);
-  const [images, setImages] = useState<{ id: number; image_id: number }[]>([]);
+  const [images, setImages] = useState<ProjectImage[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [currentImage, setCurrentImage] = useState<{ id: number; image_id: number } | null>(null);
-  const [imageUrl, setImageUrl] = useState<string>('');
+  const [imageUrl, setImageUrl] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Annotation state
-  const [currentTool, setCurrentTool] = useState<ToolType>('select');
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentBBox, setCurrentBBox] = useState<Partial<BBox> | null>(null);
-  const [currentPolygon, setCurrentPolygon] = useState<[number, number][]>([]);
+
   const [bboxes, setBboxes] = useState<BBox[]>([]);
+  const [rotatedBoxes, setRotatedBoxes] = useState<RotatedBoxAnnotation[]>([]);
   const [polygons, setPolygons] = useState<PolygonAnnotation[]>([]);
-  
+  const [masks, setMasks] = useState<MaskAnnotation[]>([]);
+  const [tagCategoryIds, setTagCategoryIds] = useState<number[]>([]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-  const [scale, setScale] = useState(1);
-  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; onConfirm: () => void }>({
-    isOpen: false,
-    onConfirm: () => {},
-  });
-  
-  const { toasts, removeToast, success, error: showError } = useToast();
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [fitScale, setFitScale] = useState(1);
+  const [zoomScale, setZoomScale] = useState(1);
+  const scale = fitScale * zoomScale;
+
+  const currentImage = images[currentImageIndex] || null;
 
   const loadData = useCallback(async () => {
     if (!workspaceId || !projectId) return;
-    
+
     try {
       setLoading(true);
-      // Fetch project and categories in parallel
       const [projectData, categoriesData] = await Promise.all([
-        projectAPI.getById(parseInt(workspaceId), parseInt(projectId)),
-        categoryAPI.getAll(parseInt(workspaceId), parseInt(projectId))
+        projectAPI.getById(parseInt(workspaceId, 10), parseInt(projectId, 10)),
+        categoryAPI.getAll(parseInt(workspaceId, 10), parseInt(projectId, 10)),
       ]);
-      
-      setProject(projectData);
-      const categoryList = Array.isArray(categoriesData) ? categoriesData : [];
-      setCategories(categoryList);
-      
-      if (categoryList.length > 0) {
-        setSelectedCategoryId(categoryList[0].id);
-      }
 
-      // Fetch all project images in batches
-      // Note: ProjectImage contains id and image_id, not full image data
+      setProject(projectData);
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+
       const batchSize = 100;
-      let allImages: { id: number; image_id: number }[] = [];
+      let allImages: ProjectImage[] = [];
       let offset = 0;
       let hasMore = true;
+
       while (hasMore) {
         const imagesData = await projectAPI.getImages(
-          parseInt(workspaceId),
-          parseInt(projectId),
-          { limit: batchSize, offset }
+          parseInt(workspaceId, 10),
+          parseInt(projectId, 10),
+          { limit: batchSize, offset },
         );
+
         const batch = imagesData.Images || [];
-        allImages = allImages.concat(batch.map(img => ({ id: img.id, image_id: img.image_id })));
+        allImages = allImages.concat(batch);
+
         if (batch.length < batchSize) {
           hasMore = false;
         } else {
           offset += batchSize;
         }
       }
+
       setImages(allImages);
     } catch (error) {
-      console.error('Failed to load data:', error);
+      console.error('Failed to load annotation viewer data:', error);
     } finally {
       setLoading(false);
     }
   }, [workspaceId, projectId]);
 
-  const loadImageUrl = useCallback(async (imageId: number) => {
-    if (!imageId) return;
-    
-    try {
-      // TODO: Implement proper image URL loading once API endpoint is available
-      // Current limitation: We only have image_id from ProjectImage, not the full image data with path
-      // This is a placeholder that will need to be implemented when the backend provides
-      // an endpoint to get image details by image_id or project_id+image_id
+  const loadImageUrl = useCallback(async (image: ProjectImage) => {
+    if (!workspaceId || !image?.id || !image?.dataset_id) {
       setImageUrl('');
-      console.warn('Image URL loading not yet implemented - need API endpoint to fetch image by image_id');
-    } catch (error) {
-      console.error('Failed to load image URL:', error);
+      return;
     }
-  }, []);
+
+    try {
+      const urlResponse = await imageAPI.getContentUrl(parseInt(workspaceId, 10), image.dataset_id, image.id);
+      setImageUrl(urlResponse.presigned_url || '');
+    } catch (error) {
+      console.error('Failed to load image content URL, fallback to path:', error);
+      setImageUrl(image.path || '');
+    }
+  }, [workspaceId]);
 
   const loadAnnotations = useCallback(async (imageId: number) => {
     if (!workspaceId || !projectId) return;
-    
+
     try {
       const annotationData = await annotationAPI.getByImage(
-        parseInt(workspaceId), 
-        parseInt(projectId), 
-        imageId
+        parseInt(workspaceId, 10),
+        parseInt(projectId, 10),
+        imageId,
       );
-      
-      // Parse existing annotations
+
       const newBboxes: BBox[] = [];
+      const newRotatedBoxes: RotatedBoxAnnotation[] = [];
       const newPolygons: PolygonAnnotation[] = [];
-      
-      if (annotationData && annotationData.data) {
-        annotationData.data.forEach((ann: GeneralAnnotation) => {
-          if (ann.data.type === 'bbox' && ann.data.bbox) {
-            const [x, y, width, height] = ann.data.bbox;
-            newBboxes.push({ x, y, width, height, categoryId: ann.category_id });
-          } else if (ann.data.type === 'polygon' && ann.data.points) {
-            newPolygons.push({ 
-              points: ann.data.points as [number, number][], 
-              categoryId: ann.category_id 
-            });
+      const newMasks: MaskAnnotation[] = [];
+      const newTags: number[] = [];
+
+      const rawAnnotations = Array.isArray(annotationData?.data) ? annotationData.data : [];
+
+      rawAnnotations.forEach((ann: any) => {
+        if (!ann || typeof ann !== 'object') return;
+
+        const categoryId = Number(ann.category_id);
+        if (!Number.isFinite(categoryId)) return;
+
+        const annData = ann.data && typeof ann.data === 'object' ? ann.data : ann;
+        const annType = annData?.type_ ?? annData?.type;
+
+        if (annType === 'tag') {
+          newTags.push(categoryId);
+          return;
+        }
+
+        if (annType === 'box') {
+          const xtl = Number(annData.xtl);
+          const ytl = Number(annData.ytl);
+          const xbr = Number(annData.xbr);
+          const ybr = Number(annData.ybr);
+          if ([xtl, ytl, xbr, ybr].every((n) => Number.isFinite(n)) && xbr > xtl && ybr > ytl) {
+            newBboxes.push({ x: xtl, y: ytl, width: xbr - xtl, height: ybr - ytl, categoryId });
           }
-        });
-      }
-      
+          return;
+        }
+
+        if (annType === 'rotated_box') {
+          const xtl = Number(annData.xtl);
+          const ytl = Number(annData.ytl);
+          const xbr = Number(annData.xbr);
+          const ybr = Number(annData.ybr);
+          const rotation = Number(annData.rotation ?? 0);
+          if ([xtl, ytl, xbr, ybr, rotation].every((n) => Number.isFinite(n)) && xbr > xtl && ybr > ytl) {
+            newRotatedBoxes.push({ xtl, ytl, xbr, ybr, rotation, categoryId });
+          }
+          return;
+        }
+
+        if (annType === 'polygon' && Array.isArray(annData.points)) {
+          const points = annData.points
+            .filter((p: any) => Array.isArray(p) && p.length >= 2)
+            .map((p: any) => [Number(p[0]), Number(p[1])] as [number, number])
+            .filter(([x, y]: [number, number]) => Number.isFinite(x) && Number.isFinite(y));
+          if (points.length >= 3) {
+            newPolygons.push({ points, categoryId });
+          }
+          return;
+        }
+
+        if (annType === 'mask' && typeof annData.rle === 'string') {
+          const left = Number(annData.left ?? 0);
+          const top = Number(annData.top ?? 0);
+          const width = Number(annData.width ?? 0);
+          const height = Number(annData.height ?? 0);
+          if ([left, top, width, height].every((n) => Number.isFinite(n)) && width > 0 && height > 0) {
+            newMasks.push({ rle: annData.rle, left, top, width, height, categoryId });
+          }
+        }
+      });
+
       setBboxes(newBboxes);
+      setRotatedBoxes(newRotatedBoxes);
       setPolygons(newPolygons);
+      setMasks(newMasks);
+      setTagCategoryIds(Array.from(new Set(newTags)));
     } catch (error) {
       console.error('Failed to load annotations:', error);
       setBboxes([]);
+      setRotatedBoxes([]);
       setPolygons([]);
+      setMasks([]);
+      setTagCategoryIds([]);
     }
   }, [workspaceId, projectId]);
+
+  const isCategoryVisible = useCallback((categoryId: number) => {
+    return selectedCategoryId === null || selectedCategoryId === categoryId;
+  }, [selectedCategoryId]);
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -173,239 +295,152 @@ export const AnnotationPage: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size to match image
     canvas.width = img.naturalWidth * scale;
     canvas.height = img.naturalHeight * scale;
 
-    // Draw image
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Draw existing bboxes
     bboxes.forEach((bbox) => {
-      const category = categories.find(c => c.id === bbox.categoryId);
+      if (!isCategoryVisible(bbox.categoryId)) return;
+      const category = categories.find((c) => c.id === bbox.categoryId);
       const color = category?.category_metadata?.color || '#FF0000';
-      
+
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
-      ctx.strokeRect(
-        bbox.x * scale, 
-        bbox.y * scale, 
-        bbox.width * scale, 
-        bbox.height * scale
-      );
-      
-      // Draw label
+      ctx.strokeRect(bbox.x * scale, bbox.y * scale, bbox.width * scale, bbox.height * scale);
+
       ctx.fillStyle = color;
-      ctx.fillRect(bbox.x * scale, bbox.y * scale - 20, 100, 20);
+      ctx.fillRect(bbox.x * scale, bbox.y * scale - 20, 120, 20);
       ctx.fillStyle = 'white';
       ctx.font = '12px Arial';
-      ctx.fillText(category?.name || 'Unknown', bbox.x * scale + 5, bbox.y * scale - 5);
+      ctx.fillText(category?.name || `Category ${bbox.categoryId}`, bbox.x * scale + 5, bbox.y * scale - 5);
     });
 
-    // Draw existing polygons
     polygons.forEach((polygon) => {
-      const category = categories.find(c => c.id === polygon.categoryId);
+      if (!isCategoryVisible(polygon.categoryId)) return;
+      if (polygon.points.length < 3) return;
+
+      const category = categories.find((c) => c.id === polygon.categoryId);
       const color = category?.category_metadata?.color || '#FF0000';
-      
-      if (polygon.points.length > 0) {
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color + '33'; // Add transparency
-        ctx.lineWidth = 2;
-        
-        ctx.beginPath();
-        ctx.moveTo(polygon.points[0][0] * scale, polygon.points[0][1] * scale);
-        for (let i = 1; i < polygon.points.length; i++) {
-          ctx.lineTo(polygon.points[i][0] * scale, polygon.points[i][1] * scale);
-        }
-        ctx.closePath();
-        ctx.stroke();
-        ctx.fill();
-        
-        // Draw points
-        polygon.points.forEach(([x, y]) => {
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.arc(x * scale, y * scale, 4, 0, 2 * Math.PI);
-          ctx.fill();
-        });
+
+      ctx.strokeStyle = color;
+      ctx.fillStyle = `${color}33`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(polygon.points[0][0] * scale, polygon.points[0][1] * scale);
+      for (let i = 1; i < polygon.points.length; i++) {
+        ctx.lineTo(polygon.points[i][0] * scale, polygon.points[i][1] * scale);
       }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
     });
 
-    // Draw current bbox being drawn
-    if (currentBBox && currentBBox.x !== undefined && currentBBox.y !== undefined && 
-        currentBBox.width !== undefined && currentBBox.height !== undefined) {
-      const category = categories.find(c => c.id === selectedCategoryId);
+    rotatedBoxes.forEach((rotBox) => {
+      if (!isCategoryVisible(rotBox.categoryId)) return;
+      const category = categories.find((c) => c.id === rotBox.categoryId);
       const color = category?.category_metadata?.color || '#FF0000';
-      
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.strokeRect(
-        currentBBox.x * scale, 
-        currentBBox.y * scale, 
-        currentBBox.width * scale, 
-        currentBBox.height * scale
-      );
-      ctx.setLineDash([]);
-    }
 
-    // Draw current polygon being drawn
-    if (currentPolygon.length > 0) {
-      const category = categories.find(c => c.id === selectedCategoryId);
-      const color = category?.category_metadata?.color || '#FF0000';
-      
+      const cx = ((rotBox.xtl + rotBox.xbr) / 2) * scale;
+      const cy = ((rotBox.ytl + rotBox.ybr) / 2) * scale;
+      const w = (rotBox.xbr - rotBox.xtl) * scale;
+      const h = (rotBox.ybr - rotBox.ytl) * scale;
+      const angleRad = (rotBox.rotation * Math.PI) / 180;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angleRad);
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      
-      ctx.beginPath();
-      ctx.moveTo(currentPolygon[0][0] * scale, currentPolygon[0][1] * scale);
-      for (let i = 1; i < currentPolygon.length; i++) {
-        ctx.lineTo(currentPolygon[i][0] * scale, currentPolygon[i][1] * scale);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.restore();
+    });
+
+    masks.forEach((maskAnn) => {
+      if (!isCategoryVisible(maskAnn.categoryId)) return;
+      const category = categories.find((c) => c.id === maskAnn.categoryId);
+      const color = category?.category_metadata?.color || '#FF0000';
+      const [r, g, b] = hexToRgb(color);
+
+      const binaryMask = decodeMaskRle(maskAnn.rle, maskAnn.width, maskAnn.height);
+      const offscreen = document.createElement('canvas');
+      offscreen.width = maskAnn.width;
+      offscreen.height = maskAnn.height;
+      const offCtx = offscreen.getContext('2d');
+      if (!offCtx) return;
+
+      const imgData = offCtx.createImageData(maskAnn.width, maskAnn.height);
+      for (let y = 0; y < maskAnn.height; y++) {
+        for (let x = 0; x < maskAnn.width; x++) {
+          const fortranIdx = y + x * maskAnn.height;
+          if (binaryMask[fortranIdx] !== 1) continue;
+          const rgbaIdx = (y * maskAnn.width + x) * 4;
+          imgData.data[rgbaIdx] = r;
+          imgData.data[rgbaIdx + 1] = g;
+          imgData.data[rgbaIdx + 2] = b;
+          imgData.data[rgbaIdx + 3] = 90;
+        }
       }
-      ctx.stroke();
-      ctx.setLineDash([]);
-      
-      // Draw points
-      currentPolygon.forEach(([x, y]) => {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(x * scale, y * scale, 4, 0, 2 * Math.PI);
-        ctx.fill();
-      });
-    }
-  }, [imageUrl, bboxes, polygons, currentBBox, currentPolygon, scale, categories, selectedCategoryId]);
-  
+      offCtx.putImageData(imgData, 0, 0);
+      ctx.drawImage(offscreen, maskAnn.left * scale, maskAnn.top * scale, maskAnn.width * scale, maskAnn.height * scale);
+    });
+  }, [imageUrl, scale, bboxes, polygons, rotatedBoxes, masks, categories, isCategoryVisible]);
+
+  const recomputeFitScale = useCallback(() => {
+    const img = imageRef.current;
+    const container = canvasContainerRef.current;
+    if (!img || !container || !img.naturalWidth || !img.naturalHeight) return;
+
+    const horizontalPadding = 24;
+    const verticalPadding = 24;
+    const availableWidth = Math.max(120, container.clientWidth - horizontalPadding);
+    const availableHeight = Math.max(120, container.clientHeight - verticalPadding);
+
+    const widthScale = availableWidth / img.naturalWidth;
+    const heightScale = availableHeight / img.naturalHeight;
+    const nextFitScale = Math.max(0.05, Math.min(widthScale, heightScale));
+
+    setFitScale(nextFitScale);
+  }, []);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   useEffect(() => {
-    if (images.length > 0 && currentImageIndex < images.length) {
-      const projectImage = images[currentImageIndex];
-      setCurrentImage(projectImage);
-      loadImageUrl(projectImage.image_id);
-      loadAnnotations(projectImage.image_id);
+    if (!currentImage) return;
+    loadImageUrl(currentImage);
+    loadAnnotations(currentImage.id);
+  }, [currentImage, loadImageUrl, loadAnnotations]);
+
+  useEffect(() => {
+    const requestedImageId = Number(searchParams.get('imageId'));
+    if (!requestedImageId || images.length === 0) return;
+
+    const targetIndex = images.findIndex((img) => img.id === requestedImageId || img.image_id === requestedImageId);
+    if (targetIndex >= 0) {
+      setCurrentImageIndex(targetIndex);
     }
-  }, [currentImageIndex, images, loadImageUrl, loadAnnotations]);
+  }, [images, searchParams]);
 
   useEffect(() => {
     if (imageUrl && canvasRef.current) {
       drawCanvas();
     }
-  }, [imageUrl, drawCanvas]);
+  }, [imageUrl, scale, drawCanvas]);
 
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (currentTool === 'select') return;
-    if (!selectedCategoryId) {
-      showError('Please select a category first');
-      return;
-    }
+  useEffect(() => {
+    setZoomScale(1);
+  }, [currentImage?.id]);
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  useEffect(() => {
+    const handleResize = () => recomputeFitScale();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [recomputeFitScale]);
 
-    const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width * canvas.width) / scale;
-    const y = ((e.clientY - rect.top) / rect.height * canvas.height) / scale;
-
-    if (currentTool === 'bbox') {
-      setIsDrawing(true);
-      setCurrentBBox({ x, y, width: 0, height: 0, categoryId: selectedCategoryId });
-    } else if (currentTool === 'polygon') {
-      setCurrentPolygon([...currentPolygon, [x, y]]);
-    }
-  };
-
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (currentTool !== 'bbox' || !isDrawing || !currentBBox) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width * canvas.width) / scale;
-    const y = ((e.clientY - rect.top) / rect.height * canvas.height) / scale;
-
-    setCurrentBBox({
-      ...currentBBox,
-      width: x - (currentBBox.x || 0),
-      height: y - (currentBBox.y || 0)
-    });
-  };
-
-  const handleCanvasMouseUp = () => {
-    if (currentTool !== 'bbox' || !isDrawing || !currentBBox) return;
-
-    setIsDrawing(false);
-    
-    if (currentBBox.width !== undefined && currentBBox.height !== undefined &&
-        Math.abs(currentBBox.width) > 5 && Math.abs(currentBBox.height) > 5) {
-      setBboxes([...bboxes, currentBBox as BBox]);
-    }
-    
-    setCurrentBBox(null);
-  };
-
-  const handleFinishPolygon = () => {
-    if (currentPolygon.length >= 3 && selectedCategoryId) {
-      setPolygons([...polygons, { points: currentPolygon, categoryId: selectedCategoryId }]);
-      setCurrentPolygon([]);
-    }
-  };
-
-  const handleSaveAnnotations = async () => {
-    if (!workspaceId || !projectId || !currentImage) return;
-
-    try {
-      const annotationData: GeneralAnnotation[] = [];
-
-      // Add bboxes
-      bboxes.forEach(bbox => {
-        annotationData.push({
-          category_id: bbox.categoryId,
-          data: {
-            type: 'bbox',
-            bbox: [bbox.x, bbox.y, bbox.width, bbox.height]
-          }
-        });
-      });
-
-      // Add polygons
-      polygons.forEach(polygon => {
-        annotationData.push({
-          category_id: polygon.categoryId,
-          data: {
-            type: 'polygon',
-            points: polygon.points
-          }
-        });
-      });
-
-      await annotationAPI.create(
-        parseInt(workspaceId),
-        parseInt(projectId),
-        currentImage.id,
-        { data: annotationData }
-      );
-
-      success('Annotations saved successfully!');
-    } catch (error) {
-      console.error('Failed to save annotations:', error);
-      showError('Failed to save annotations');
-    }
-  };
-
-  const handleClearAll = () => {
-    setConfirmDialog({
-      isOpen: true,
-      onConfirm: () => {
-        setBboxes([]);
-        setPolygons([]);
-        setCurrentBBox(null);
-        setCurrentPolygon([]);
-      },
-    });
+  const handleImageLoad = () => {
+    recomputeFitScale();
   };
 
   const handleNextImage = () => {
@@ -423,7 +458,7 @@ export const AnnotationPage: React.FC = () => {
   if (loading) {
     return (
       <Layout>
-        <LoadingState message="Loading annotation tool..." />
+        <LoadingState message="Loading annotation viewer..." />
       </Layout>
     );
   }
@@ -435,7 +470,7 @@ export const AnnotationPage: React.FC = () => {
           <Card>
             <CardContent className="p-6">
               <p className="text-center text-gray-600">
-                {!project ? 'Project not found' : 'Please create categories before annotating images'}
+                {!project ? 'Project not found' : 'No categories found for this project.'}
               </p>
               <div className="flex justify-center mt-4">
                 <Button onClick={() => navigate(`/workspaces/${workspaceId}/projects/${projectId}`)}>
@@ -451,20 +486,8 @@ export const AnnotationPage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="flex flex-col h-full bg-gray-50">
-        <ToastContainer toasts={toasts} onRemove={removeToast} />
-        <ConfirmDialog
-          isOpen={confirmDialog.isOpen}
-          onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-          onConfirm={confirmDialog.onConfirm}
-          title="Clear All Annotations"
-          message="Are you sure you want to clear all annotations?"
-          confirmText="Clear All"
-          cancelText="Cancel"
-          confirmVariant="danger"
-        />
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
+      <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm flex-shrink-0">
           <div className="max-w-full mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -476,13 +499,13 @@ export const AnnotationPage: React.FC = () => {
                   Back to Project
                 </Button>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{project.name} - Annotation</h1>
-                  <p className="text-sm text-gray-600">
-                    Image {currentImageIndex + 1} of {images.length}
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{project.name} - Annotation Viewer</h1>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Image {images.length === 0 ? 0 : currentImageIndex + 1} of {images.length}
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
@@ -498,69 +521,38 @@ export const AnnotationPage: React.FC = () => {
                 >
                   Next
                 </Button>
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={handleSaveAnnotations}
-                >
-                  <SaveIcon className="h-4 w-4 mr-2" />
-                  Save
-                </Button>
               </div>
+            </div>
+
+            <div className="mt-3 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded px-3 py-2">
+              Viewer mode is enabled. This page only displays existing annotations for the current image.
             </div>
           </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar */}
-          <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
+          <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
             <div className="p-4 space-y-4">
-              {/* Tools */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Tools</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    variant={currentTool === 'select' ? 'primary' : 'outline'}
-                    className="w-full"
-                    onClick={() => setCurrentTool('select')}
-                  >
-                    <MousePointerIcon className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={currentTool === 'bbox' ? 'primary' : 'outline'}
-                    className="w-full"
-                    onClick={() => setCurrentTool('bbox')}
-                  >
-                    <SquareIcon className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={currentTool === 'polygon' ? 'primary' : 'outline'}
-                    className="w-full"
-                    onClick={() => setCurrentTool('polygon')}
-                  >
-                    <PenToolIcon className="h-4 w-4" />
-                  </Button>
-                </div>
-                {currentTool === 'polygon' && currentPolygon.length > 0 && (
-                  <Button
-                    className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white"
-                    onClick={handleFinishPolygon}
-                  >
-                    Finish Polygon ({currentPolygon.length} points)
-                  </Button>
-                )}
-              </div>
-
-              {/* Categories */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Categories</h3>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Categories Filter</h3>
                 <div className="space-y-1">
-                  {categories.map(category => (
+                  <button
+                    className={`w-full text-left px-3 py-2 rounded ${
+                      selectedCategoryId === null
+                        ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-500'
+                        : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
+                    }`}
+                    onClick={() => setSelectedCategoryId(null)}
+                  >
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">All Categories</span>
+                  </button>
+                  {categories.map((category) => (
                     <button
                       key={category.id}
                       className={`w-full text-left px-3 py-2 rounded flex items-center space-x-2 ${
                         selectedCategoryId === category.id
-                          ? 'bg-blue-100 border border-blue-500'
-                          : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                          ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-500'
+                          : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
                       }`}
                       onClick={() => setSelectedCategoryId(category.id)}
                     >
@@ -568,56 +560,50 @@ export const AnnotationPage: React.FC = () => {
                         className="w-4 h-4 rounded"
                         style={{ backgroundColor: category.category_metadata?.color || '#3B82F6' }}
                       />
-                      <span className="text-sm font-medium">{category.name}</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{category.name}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Annotations List */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-gray-700">Annotations</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleClearAll}
-                  >
-                    <TrashIcon className="h-3 w-3 mr-1" />
-                    Clear All
-                  </Button>
-                </div>
-                <div className="space-y-1 text-sm text-gray-600">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Annotations Summary</h3>
+                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                   <p>Bounding Boxes: {bboxes.length}</p>
+                  <p>Rotated Boxes: {rotatedBoxes.length}</p>
                   <p>Polygons: {polygons.length}</p>
+                  <p>Masks: {masks.length}</p>
+                  <p>Tags: {tagCategoryIds.length}</p>
                 </div>
               </div>
 
-              {/* Zoom Controls */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Zoom</h3>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Zoom</h3>
                 <div className="flex items-center space-x-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setScale(Math.max(0.1, scale - 0.1))}
+                    onClick={() => setZoomScale((prev) => Math.max(0.2, prev / 1.15))}
                   >
                     <ZoomOutIcon className="h-4 w-4" />
                   </Button>
-                  <span className="text-sm text-gray-600 min-w-[60px] text-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[60px] text-center">
                     {Math.round(scale * 100)}%
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setScale(Math.min(3, scale + 0.1))}
+                    onClick={() => setZoomScale((prev) => Math.min(8, prev * 1.15))}
                   >
                     <ZoomInIcon className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setScale(1)}
+                    onClick={() => {
+                      setZoomScale(1);
+                      recomputeFitScale();
+                    }}
                   >
                     Reset
                   </Button>
@@ -626,9 +612,8 @@ export const AnnotationPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Canvas Area */}
-          <div className="flex-1 overflow-auto bg-gray-100 p-4">
-            <div className="flex items-center justify-center min-h-full">
+          <div className="flex-1 overflow-auto bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-800 p-4">
+            <div ref={canvasContainerRef} className="flex items-center justify-center min-h-full">
               {imageUrl ? (
                 <div className="relative">
                   <img
@@ -636,18 +621,15 @@ export const AnnotationPage: React.FC = () => {
                     src={imageUrl}
                     alt="Annotation target"
                     className="hidden"
-                    onLoad={drawCanvas}
+                    onLoad={handleImageLoad}
                   />
                   <canvas
                     ref={canvasRef}
-                    className="border border-gray-300 shadow-lg bg-white cursor-crosshair"
-                    onMouseDown={handleCanvasMouseDown}
-                    onMouseMove={handleCanvasMouseMove}
-                    onMouseUp={handleCanvasMouseUp}
+                    className="border border-gray-300 shadow-lg bg-white"
                   />
                 </div>
               ) : (
-                <div className="text-center text-gray-500">
+                <div className="text-center text-gray-500 dark:text-gray-400">
                   <p>No image to display</p>
                 </div>
               )}

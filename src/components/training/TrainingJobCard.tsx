@@ -6,7 +6,6 @@ import type { TrainingJob } from '../../types';
 interface TrainingJobCardProps {
   job: TrainingJob;
   onCancel?: (projectId: number, jobId: number) => void;
-  onDelete?: (projectId: number, jobId: number) => void;
   onView?: (job: TrainingJob) => void;
 }
 
@@ -48,11 +47,9 @@ const getStatusInfo = (status: TrainingJob['status']) => {
 export const TrainingJobCard: React.FC<TrainingJobCardProps> = ({
   job,
   onCancel,
-  onDelete,
   onView,
 }) => {
   const canCancel = job.status === 'running' || job.status === 'standby';
-  const canDelete = job.status === 'finished' || job.status === 'canceled' || job.status === 'failed';
   const statusInfo = getStatusInfo(job.status);
 
   return (
@@ -138,15 +135,6 @@ export const TrainingJobCard: React.FC<TrainingJobCardProps> = ({
               </Button>
             )}
             
-            {canDelete && onDelete && (
-              <Button
-                onClick={() => onDelete(job.project_id, job.id)}
-                variant="outline"
-                className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/20"
-              >
-                Delete
-              </Button>
-            )}
           </div>
         </div>
       </CardContent>

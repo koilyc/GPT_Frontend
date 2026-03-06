@@ -76,12 +76,21 @@ api.interceptors.request.use((config) => {
 });
 
 // Handle auth errors
+const clearAuthAndRedirectToLogin = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('auth-storage');
+
+  if (window.location.pathname !== '/login') {
+    window.location.assign('/login');
+  }
+};
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      window.location.href = '/login';
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
+      clearAuthAndRedirectToLogin();
     }
     return Promise.reject(error);
   }
@@ -136,6 +145,7 @@ export const authAPI = {
   // Logout
   logout: (): void => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('auth-storage');
   },
 };
 
@@ -522,9 +532,17 @@ export const annotationAPI = {
   },
 
   // Get annotations by image
-  getByImage: async (workspaceId: number, projectId: number, imageId: number): Promise<Annotation> => {
-    const response = await api.get(`/api/workspaces/${workspaceId}/projects/${projectId}/images/${imageId}/annotations`);
-    return response.data;
+  getByImage: async (workspaceId: number, projectId: number, imageId: number): Promise<Annotation | null> => {
+    try {
+      const response = await api.get(`/api/workspaces/${workspaceId}/projects/${projectId}/images/${imageId}/annotations`);
+      return response.data;
+    } catch (error: any) {
+      // Backend returns 404 when the image has no saved annotation yet.
+      if (error?.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   // Get all annotations in project

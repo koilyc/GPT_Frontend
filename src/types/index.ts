@@ -219,10 +219,21 @@ export interface ProjectImageListResponse {
 
 export interface ProjectImage {
   id: number;
-  project_id: number;
-  image_id: number;
+  dataset_id: number;
+  workspace_id: number;
+  name: string;
+  path: string;
+  thumbnail_path?: string;
+  image_metadata?: ImageMetadata;
+  project_id?: number;
+  image_id?: number;
   created_by: number;
   created_at: string;
+  initial_split?: {
+    train?: boolean;
+    val?: boolean;
+    test?: boolean;
+  };
 }
 
 // Dataset Types
@@ -292,15 +303,76 @@ export interface ImagePresignedUrlResponse {
 }
 
 // Annotation Types
-export interface GeneralAnnotation {
+export type AnnotationType = 'tag' | 'box' | 'rotated_box' | 'polygon' | 'mask';
+
+export interface TagAnnotation {
+  type_: 'tag';
   category_id: number;
-  data: {
-    type: 'bbox' | 'polygon' | 'obb' | 'classification';
+}
+
+export interface BoxAnnotation {
+  type_: 'box';
+  category_id: number;
+  xtl: number;
+  ytl: number;
+  xbr: number;
+  ybr: number;
+  occluded?: boolean;
+  z_order?: number;
+}
+
+export interface RotatedBoxAnnotation extends BoxAnnotation {
+  type_: 'rotated_box';
+  rotation?: number;
+}
+
+export interface PolygonAnnotationData {
+  type_: 'polygon';
+  category_id: number;
+  points: number[][];
+  occluded?: boolean;
+  z_order?: number;
+}
+
+export interface MaskAnnotationData {
+  type_: 'mask';
+  category_id: number;
+  rle: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  occluded?: boolean;
+  z_order?: number;
+}
+
+// Keep a loose-compatible fallback for old payloads still present in some environments.
+export type LegacyGeneralAnnotation = {
+  category_id: number;
+  data?: {
+    type?: 'bbox' | 'polygon' | 'obb' | 'classification';
     points?: number[][];
     bbox?: [number, number, number, number];
     obb?: number[];
   };
-}
+  type?: string;
+  type_?: string;
+  points?: number[][];
+  bbox?: [number, number, number, number];
+  rle?: string;
+  left?: number;
+  top?: number;
+  width?: number;
+  height?: number;
+};
+
+export type GeneralAnnotation =
+  | TagAnnotation
+  | BoxAnnotation
+  | RotatedBoxAnnotation
+  | PolygonAnnotationData
+  | MaskAnnotationData
+  | LegacyGeneralAnnotation;
 
 export interface Annotation {
   id: number;

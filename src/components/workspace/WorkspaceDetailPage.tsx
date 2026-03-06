@@ -29,6 +29,8 @@ import {
   MailIcon
 } from 'lucide-react';
 
+const MAX_TRAINING_PAGE_SIZE = 100;
+
 // Types for component forms
 interface CreateProjectForm {
   name: string;
@@ -119,7 +121,13 @@ export const WorkspaceDetailPage: React.FC = () => {
   const { addToRecent } = useRecentWorkspaces();
 
   // Training jobs hook
-  const { trainingJobs, totalCount: trainingJobsTotalCount, loading: trainingJobsLoading, error: trainingJobsError } = useTrainingJobs(workspaceId ? parseInt(workspaceId) : undefined);
+  const {
+    trainingJobs,
+    totalCount: trainingJobsTotalCount,
+    loading: trainingJobsLoading,
+    error: trainingJobsError,
+    fetchTrainingJobs,
+  } = useTrainingJobs(workspaceId ? parseInt(workspaceId) : undefined);
 
   // Add workspace to recent list when it's loaded
   useEffect(() => {
@@ -156,6 +164,26 @@ export const WorkspaceDetailPage: React.FC = () => {
       loadQuotas();
     }
   }, [activeTab, workspaceId]);
+
+  // Keep training jobs tab aligned with backend pagination (limit <= 100).
+  useEffect(() => {
+    if (activeTab !== 'training-jobs' || !workspaceId) return;
+
+    const safePageSize = Math.min(trainingJobsPageSize, MAX_TRAINING_PAGE_SIZE);
+    const offset = (trainingJobsPage - 1) * safePageSize;
+
+    fetchTrainingJobs({
+      limit: safePageSize,
+      offset,
+      order_by: 'created_at',
+      desc: true,
+    });
+  }, [activeTab, workspaceId, trainingJobsPage, trainingJobsPageSize, fetchTrainingJobs]);
+
+  const handleTrainingJobsPageSizeChange = (newPageSize: number) => {
+    setTrainingJobsPage(1);
+    setTrainingJobsPageSize(Math.min(newPageSize, MAX_TRAINING_PAGE_SIZE));
+  };
 
   const loadMembersCount = async () => {
     if (!workspaceId) return;
@@ -742,6 +770,14 @@ export const WorkspaceDetailPage: React.FC = () => {
 
   const renderTrainingJobs = () => (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button
+          onClick={() => navigate(`/workspaces/${workspaceId}/training-jobs`)}
+          className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white"
+        >
+          Open Full Training Jobs Page
+        </Button>
+      </div>
 
       {trainingJobsLoading ? (
         <Card>
@@ -760,7 +796,17 @@ export const WorkspaceDetailPage: React.FC = () => {
             </div>
             <h3 className="text-lg font-medium text-red-900 dark:text-red-100 mb-2">Error Loading Training Jobs</h3>
             <p className="text-red-600 dark:text-red-400 mb-4">{trainingJobsError}</p>
-            <Button onClick={() => window.location.reload()}>
+            <Button
+              onClick={() => {
+                const safePageSize = Math.min(trainingJobsPageSize, MAX_TRAINING_PAGE_SIZE);
+                fetchTrainingJobs({
+                  limit: safePageSize,
+                  offset: (trainingJobsPage - 1) * safePageSize,
+                  order_by: 'created_at',
+                  desc: true,
+                });
+              }}
+            >
               Try Again
             </Button>
           </CardContent>
@@ -768,11 +814,11 @@ export const WorkspaceDetailPage: React.FC = () => {
       ) : trainingJobs && trainingJobs.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {trainingJobs.slice((trainingJobsPage - 1) * trainingJobsPageSize, trainingJobsPage * trainingJobsPageSize).map((job) => (
+            {trainingJobs.map((job) => (
               <TrainingJobCard
                 key={job.id}
                 job={job}
-                onView={(job) => navigate(`/workspaces/${workspaceId}/projects/${job.project_id}/training-jobs/${job.id}`)}
+                onView={(job) => navigate(`/workspaces/${workspaceId}/projects/${job.project_id}/training-jobs`)}
               />
             ))}
           </div>
@@ -977,13 +1023,39 @@ export const WorkspaceDetailPage: React.FC = () => {
         </Card>
       ) : quotas && quotas.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {quotas.map((quota, index) => {
+          {Array.from(
+            quotas.reduce((grouped, quota) => {
+              const resourceType = quota.resource_type || 'unknown';
+              const existing = grouped.get(resourceType);
+
+              if (!existing) {
+                grouped.set(resourceType, {
+                  ...quota,
+                  resource_type: resourceType,
+                });
+                return grouped;
+              }
+
+              const mergedLimit =
+                existing.limit === -1 || quota.limit === -1
+                  ? -1
+                  : existing.limit + quota.limit;
+
+              grouped.set(resourceType, {
+                ...existing,
+                current: existing.current + quota.current,
+                limit: mergedLimit,
+              });
+
+              return grouped;
+            }, new Map<string, typeof quotas[number]>()),
+          ).map(([resourceType, quota]) => {
             const usagePercentage = quota.limit > 0 ? (quota.current / quota.limit) * 100 : 0;
             const isWarning = usagePercentage > 80;
             const isDanger = usagePercentage > 95;
             
             return (
-              <Card key={index} className={`hover:shadow-lg transition-all duration-300 ${
+              <Card key={resourceType} className={`hover:shadow-lg transition-all duration-300 ${
                 isDanger 
                   ? 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-300 dark:border-red-700'
                   : isWarning
@@ -1014,12 +1086,12 @@ export const WorkspaceDetailPage: React.FC = () => {
                         ? 'bg-yellow-200 text-yellow-800 dark:bg-yellow-800/40 dark:text-yellow-300'
                         : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                     }`}>
-                      {quota.resource_type}
+                      {resourceType}
                     </span>
                   </div>
                   
                   <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 capitalize">
-                    {quota.resource_type.replace('_', ' ')}
+                    {resourceType.replace('_', ' ')}
                   </h3>
                   
                   <div className="space-y-3">
@@ -1201,7 +1273,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                     totalCount={trainingJobsTotalCount}
                     pageSize={trainingJobsPageSize}
                     onPageChange={setTrainingJobsPage}
-                    onPageSizeChange={setTrainingJobsPageSize}
+                    onPageSizeChange={handleTrainingJobsPageSizeChange}
                     gridConfig={{ cols: { sm: 1, md: 2, lg: 4, xl: 4 } }}
                   />
                 )}
