@@ -468,7 +468,7 @@ export const datasetAPI = {
 // Image API
 export const imageAPI = {
   // Get all images in dataset
-  getAll: async (workspaceId: number, datasetId: number, params?: PaginationParams): Promise<ImageListResponse> => {
+  getAll: async (workspaceId: number, datasetId: number, params?: CommonQueryParams): Promise<ImageListResponse> => {
     const response = await api.get(`/api/workspaces/${workspaceId}/datasets/${datasetId}/images`, { params });
     return response.data;
   },
