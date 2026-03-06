@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from './Button';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, SortAscIcon, SortDescIcon, SparklesIcon } from 'lucide-react';
 
 interface PaginationProps {
   currentPage: number;
@@ -12,6 +12,14 @@ interface PaginationProps {
     cols: { sm: number; md: number; lg: number; xl: number };
     rows?: number; // 預設每頁顯示的行數
   };
+  sortControl?: {
+    label?: string;
+    options: Array<{ value: string; label: string }>;
+    value: string;
+    onChange: (value: string) => void;
+    desc: boolean;
+    onToggleDirection: () => void;
+  };
 }
 
 export const Pagination: React.FC<PaginationProps> = ({
@@ -20,7 +28,8 @@ export const Pagination: React.FC<PaginationProps> = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  gridConfig
+  gridConfig,
+  sortControl,
 }) => {
   const totalPages = Math.ceil(totalCount / pageSize);
   const startItem = (currentPage - 1) * pageSize + 1;
@@ -48,15 +57,6 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   const pageSizeOptions = getPageSizeOptions();
 
-  console.log('Pagination component debug:', {
-    totalCount,
-    pageSize,
-    totalPages,
-    currentPage,
-    startItem,
-    endItem
-  });
-
   const generatePageNumbers = () => {
     const pages = [];
     const showPages = 5; // 顯示的頁數
@@ -76,10 +76,8 @@ export const Pagination: React.FC<PaginationProps> = ({
     return pages;
   };
 
-  // Always show pagination if there are items (temporarily disable the totalPages <= 1 check)
-  // if (totalPages <= 1) return null;
-
   if (totalCount === 0) return null;
+  if (totalPages <= 1 && !sortControl) return null;
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 sm:px-6 gap-2">
@@ -109,6 +107,43 @@ export const Pagination: React.FC<PaginationProps> = ({
             ))}
           </select>
         </div>
+
+        {sortControl && (
+          <div className="flex items-center space-x-2">
+            <label className="text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap flex items-center gap-1">
+              <SparklesIcon className="w-3 h-3 text-pink-500" />
+              {sortControl.label || 'Order by'}
+            </label>
+            <select
+              value={sortControl.value}
+              onChange={(e) => sortControl.onChange(e.target.value)}
+              className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 pr-6 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 min-w-[130px] cursor-pointer"
+            >
+              {sortControl.options.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={sortControl.onToggleDirection}
+              className="h-7 px-2 text-xs rounded-full border-pink-300 hover:border-pink-400 hover:bg-pink-50"
+              title={sortControl.desc ? 'Descending' : 'Ascending'}
+            >
+              {sortControl.desc ? (
+                <span className="flex items-center gap-1">
+                  <SortDescIcon className="w-3 h-3 text-pink-600" />
+                  <span>Desc</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <SortAscIcon className="w-3 h-3 text-pink-600" />
+                  <span>Asc</span>
+                </span>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* 分頁控制 */}
