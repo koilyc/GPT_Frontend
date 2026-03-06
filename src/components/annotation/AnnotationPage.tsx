@@ -105,6 +105,9 @@ const decodeMaskRle = (encoded: string, width: number, height: number): Uint8Arr
   return mask;
 };
 
+const IMAGE_BATCH_SIZE = 100;
+const IMAGE_PREFETCH_THRESHOLD = 5;
+
 export const AnnotationPage: React.FC = () => {
   const { workspaceId, projectId } = useParams<{ workspaceId: string; projectId: string }>();
   const [searchParams] = useSearchParams();
@@ -112,6 +115,11 @@ export const AnnotationPage: React.FC = () => {
 
   const [project, setProject] = useState<Project | null>(null);
   const [images, setImages] = useState<ProjectImage[]>([]);
+  const [imagesTotalCount, setImagesTotalCount] = useState(0);
+  const [loadingMoreImages, setLoadingMoreImages] = useState(false);
+  const [jumpIndexInput, setJumpIndexInput] = useState('');
+  const [jumpImageIdInput, setJumpImageIdInput] = useState('');
+  const [jumpingToImage, setJumpingToImage] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageUrl, setImageUrl] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -132,6 +140,16 @@ export const AnnotationPage: React.FC = () => {
   const scale = fitScale * zoomScale;
 
   const currentImage = images[currentImageIndex] || null;
+  const imagesRef = useRef<ProjectImage[]>([]);
+  const imagesTotalCountRef = useRef(0);
+
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  useEffect(() => {
+    imagesTotalCountRef.current = imagesTotalCount;
+  }, [imagesTotalCount]);
 
   const loadData = useCallback(async () => {
     if (!workspaceId || !projectId) return;
@@ -146,35 +164,122 @@ export const AnnotationPage: React.FC = () => {
       setProject(projectData);
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
 
-      const batchSize = 100;
-      let allImages: ProjectImage[] = [];
-      let offset = 0;
-      let hasMore = true;
+      const imagesData = await projectAPI.getImages(
+        parseInt(workspaceId, 10),
+        parseInt(projectId, 10),
+        { limit: IMAGE_BATCH_SIZE, offset: 0 },
+      );
 
-      while (hasMore) {
-        const imagesData = await projectAPI.getImages(
-          parseInt(workspaceId, 10),
-          parseInt(projectId, 10),
-          { limit: batchSize, offset },
-        );
-
-        const batch = imagesData.Images || [];
-        allImages = allImages.concat(batch);
-
-        if (batch.length < batchSize) {
-          hasMore = false;
-        } else {
-          offset += batchSize;
-        }
-      }
-
-      setImages(allImages);
+      const initialBatch = imagesData.Images || [];
+      setImages(initialBatch);
+      setImagesTotalCount(imagesData.total_count || initialBatch.length);
     } catch (error) {
       console.error('Failed to load annotation viewer data:', error);
     } finally {
       setLoading(false);
     }
   }, [workspaceId, projectId]);
+
+  const loadMoreImages = useCallback(async (): Promise<boolean> => {
+    if (!workspaceId || !projectId || loadingMoreImages) return false;
+    const loadedCount = imagesRef.current.length;
+    if (loadedCount >= imagesTotalCountRef.current) return false;
+
+    try {
+      setLoadingMoreImages(true);
+      const imagesData = await projectAPI.getImages(
+        parseInt(workspaceId, 10),
+        parseInt(projectId, 10),
+        { limit: IMAGE_BATCH_SIZE, offset: loadedCount },
+      );
+
+      const batch = imagesData.Images || [];
+      if (batch.length === 0) return false;
+
+      let hasAppended = false;
+
+      setImages((prev) => {
+        const existingIds = new Set(prev.map((img) => img.id));
+        const dedupedBatch = batch.filter((img) => !existingIds.has(img.id));
+        if (dedupedBatch.length === 0) {
+          imagesRef.current = prev;
+          return prev;
+        }
+
+        hasAppended = true;
+        const merged = [...prev, ...dedupedBatch];
+        imagesRef.current = merged;
+        return merged;
+      });
+      const nextTotalCount = imagesData.total_count || imagesTotalCountRef.current;
+      setImagesTotalCount(nextTotalCount);
+      imagesTotalCountRef.current = nextTotalCount;
+
+      return hasAppended;
+    } catch (error) {
+      console.error('Failed to load more images:', error);
+      return false;
+    } finally {
+      setLoadingMoreImages(false);
+    }
+  }, [workspaceId, projectId, loadingMoreImages]);
+
+  const findImageIndexById = useCallback((imageId: number) => {
+    return imagesRef.current.findIndex((img) => img.id === imageId || img.image_id === imageId);
+  }, []);
+
+  const ensureLoadedUpToIndex = useCallback(async (targetIndex: number) => {
+    let safetyCounter = 0;
+    while (
+      imagesRef.current.length <= targetIndex &&
+      imagesRef.current.length < imagesTotalCountRef.current &&
+      safetyCounter < 50
+    ) {
+      const appended = await loadMoreImages();
+      if (!appended) break;
+      safetyCounter += 1;
+    }
+  }, [loadMoreImages]);
+
+  const handleJumpToIndex = useCallback(async () => {
+    const requestedIndex = Number(jumpIndexInput);
+    const totalCount = imagesTotalCountRef.current || imagesRef.current.length;
+    if (!Number.isFinite(requestedIndex) || requestedIndex < 1 || requestedIndex > totalCount) return;
+
+    setJumpingToImage(true);
+    try {
+      const targetIndex = requestedIndex - 1;
+      await ensureLoadedUpToIndex(targetIndex);
+      if (targetIndex < imagesRef.current.length) {
+        setCurrentImageIndex(targetIndex);
+      }
+    } finally {
+      setJumpingToImage(false);
+    }
+  }, [jumpIndexInput, ensureLoadedUpToIndex]);
+
+  const handleJumpToImageId = useCallback(async () => {
+    const requestedId = Number(jumpImageIdInput);
+    if (!Number.isFinite(requestedId) || requestedId <= 0) return;
+
+    setJumpingToImage(true);
+    try {
+      let targetIndex = findImageIndexById(requestedId);
+      let safetyCounter = 0;
+      while (targetIndex < 0 && imagesRef.current.length < imagesTotalCountRef.current && safetyCounter < 50) {
+        const appended = await loadMoreImages();
+        if (!appended) break;
+        targetIndex = findImageIndexById(requestedId);
+        safetyCounter += 1;
+      }
+
+      if (targetIndex >= 0) {
+        setCurrentImageIndex(targetIndex);
+      }
+    } finally {
+      setJumpingToImage(false);
+    }
+  }, [jumpImageIdInput, findImageIndexById, loadMoreImages]);
 
   const loadImageUrl = useCallback(async (image: ProjectImage) => {
     if (!workspaceId || !image?.id || !image?.dataset_id) {
@@ -424,6 +529,26 @@ export const AnnotationPage: React.FC = () => {
   }, [images, searchParams]);
 
   useEffect(() => {
+    if (currentImageIndex >= images.length - IMAGE_PREFETCH_THRESHOLD && images.length < imagesTotalCount) {
+      void loadMoreImages();
+    }
+  }, [currentImageIndex, images.length, imagesTotalCount, loadMoreImages]);
+
+  useEffect(() => {
+    const requestedImageId = Number(searchParams.get('imageId'));
+    if (!requestedImageId || images.length === 0) return;
+
+    const found = images.some((img) => img.id === requestedImageId || img.image_id === requestedImageId);
+    if (!found && images.length < imagesTotalCount) {
+      void loadMoreImages();
+    }
+  }, [images, imagesTotalCount, searchParams, loadMoreImages]);
+
+  const loadedProgressPercent = imagesTotalCount > 0
+    ? Math.min(100, Math.round((images.length / imagesTotalCount) * 100))
+    : 100;
+
+  useEffect(() => {
     if (imageUrl && canvasRef.current) {
       drawCanvas();
     }
@@ -443,9 +568,16 @@ export const AnnotationPage: React.FC = () => {
     recomputeFitScale();
   };
 
-  const handleNextImage = () => {
+  const handleNextImage = async () => {
     if (currentImageIndex < images.length - 1) {
       setCurrentImageIndex(currentImageIndex + 1);
+      return;
+    }
+
+    if (images.length < imagesTotalCount) {
+      const previousLoadedCount = images.length;
+      await loadMoreImages();
+      setCurrentImageIndex((prev) => (prev === previousLoadedCount - 1 ? prev + 1 : prev));
     }
   };
 
@@ -501,7 +633,8 @@ export const AnnotationPage: React.FC = () => {
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{project.name} - Annotation Viewer</h1>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Image {images.length === 0 ? 0 : currentImageIndex + 1} of {images.length}
+                    Image {images.length === 0 ? 0 : currentImageIndex + 1} of {imagesTotalCount || images.length}
+                    {loadingMoreImages ? ' (loading more...)' : ''}
                   </p>
                 </div>
               </div>
@@ -517,11 +650,62 @@ export const AnnotationPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={handleNextImage}
-                  disabled={currentImageIndex >= images.length - 1}
+                  disabled={currentImageIndex >= (imagesTotalCount || images.length) - 1}
                 >
                   Next
                 </Button>
               </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={imagesTotalCount || undefined}
+                  value={jumpIndexInput}
+                  onChange={(e) => setJumpIndexInput(e.target.value)}
+                  placeholder={`Go to # (1-${imagesTotalCount || images.length || 1})`}
+                  className="h-9"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => void handleJumpToIndex()}
+                  disabled={jumpingToImage || loadingMoreImages}
+                >
+                  Go
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={jumpImageIdInput}
+                  onChange={(e) => setJumpImageIdInput(e.target.value)}
+                  placeholder="Go to image ID"
+                  className="h-9"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => void handleJumpToImageId()}
+                  disabled={jumpingToImage || loadingMoreImages}
+                >
+                  Go
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <div className="h-2 w-full rounded bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 transition-all duration-300"
+                  style={{ width: `${loadedProgressPercent}%` }}
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                Loaded {images.length} / {imagesTotalCount || images.length} images ({loadedProgressPercent}%)
+              </p>
             </div>
 
             <div className="mt-3 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded px-3 py-2">
